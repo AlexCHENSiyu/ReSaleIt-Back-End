@@ -193,7 +193,8 @@ def merge_lists(list1, list2, key):
 
 # API below
 app = Flask(__name__)
-
+mongo = mongodb_init()
+db = get_db(mongo, 'chen_db')
 
 @app.route('/drop-table')
 # http://localhost:5000/drop_table
@@ -886,10 +887,20 @@ def GetPosts():
         return_data["Error"] = Error
         return return_data
     
+    Num = request.args.get("Num")
+    if Num: # not null
+        Num = int(Num)
+        if Num <= 0 and Num > 10:
+            return_data["Success"] = False
+            return_data["Error"] = "Parameter Num is not in valid range."
+            return return_data
+    else:
+        Num = 10
+    
     Keyword = request.args.get('Keyword')
     if Keyword:
         # 用户提供了关键词：
-        scored_Posts = db.Posts.find({"$text":{"$search": Keyword}},{"Score":{"$meta": "textScore"}}) #.sort("Score", pymongo.ASCENDING)  #pymongo.DESCENDING？sort似乎有问题,放弃使用
+        scored_Posts = db.Posts.find({"$text":{"$search": Keyword}, "Deleted": {"$ne": True}}, {"Score":{"$meta": "textScore"}}).limit(Num) # 返回最多十条未被删除的posts
     else:
         # 用户未提供关键词：
         UserInfo = db.UserInfos.find_one({'EmailAddress': EmailAddress})
@@ -898,15 +909,16 @@ def GetPosts():
             Fields = "" # 将用户所有的喜欢领域作为关键词检索
             for Field in FavoriteFields:
                 Fields += ' ' + Field
-            scored_Posts = db.Posts.find({"$text":{"$search": Fields}},{"Score":{"$meta": "textScore"}}) #.sort("Score", pymongo.ASCENDING)  #pymongo.DESCENDING？sort似乎有问题,放弃使用
+            scored_Posts = db.Posts.find({"$text":{"$search": Fields}, "Deleted": {"$ne": True}},{"Score":{"$meta": "textScore"}}).limit(Num) # 返回最多十条未被删除的posts
             scored_Posts = sorted(scored_Posts, key=itemgetter('Score'), reverse=True) # 降序排序
         else:
             # 用户没有设置喜欢的领域
-            count = db.Posts.count_documents({})
-            if count >10:
-                scored_Posts = db.Posts.aggregate([{ '$sample': { 'size': 10 } }])
+            count = db.Posts.count_documents({'Deleted': {'$ne': True}})
+            print("count:", count)
+            if count > Num:
+                scored_Posts = db.Posts.aggregate([ {'$match': {'Deleted': {'$ne': True}}}, {'$sample': {'size': Num}} ])
             else:
-                scored_Posts = db.Posts.aggregate([{ '$sample': { 'size': count } }])
+                scored_Posts = db.Posts.aggregate([ {'$match': {'Deleted': {'$ne': True}}}, {'$sample': {'size': count}} ])
                 
     for scored_Post in scored_Posts:
         # 检查帖子是否被删除
@@ -1034,9 +1046,6 @@ def GetPostHistory():
     return_data["Success"] = True
 
     return return_data
-
-mongo = mongodb_init()
-db = get_db(mongo, 'chen_db')
 
 
 if __name__ == '__main__':
