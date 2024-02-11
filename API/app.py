@@ -772,23 +772,22 @@ def UserPosts():
         return return_data
     
     # 查照所有该用户没有被删除的帖子
-    user_Posts = db.Posts.find({"PostOwner":EmailAddress})
+    user_Posts = db.Posts.find({"PostOwner":EmailAddress, 'Deleted': {'$ne': True}}).limit(10)
     for user_Post in user_Posts:
-        if not user_Post.get("Deleted"):
-            NewPost = \
-            {
-                "PID": str(user_Post['_id']), \
-                "PostOwner": user_Post.get("PostOwner"),\
-                "CreateTime": user_Post.get('CreateTime'),\
-                "Title": user_Post.get("Title"), \
-                "Text": user_Post.get("Text"), \
-                "Price": user_Post.get("Price"), \
-                "Auction": user_Post.get("Auction"),\
-                "LostFound": user_Post.get("LostFound"),\
-                "Images": user_Post.get("Images"),\
-                "Comments": user_Post.get('Comments')\
-            }
-            Posts.append(NewPost)
+        NewPost = \
+        {
+            "PID": str(user_Post['_id']), \
+            "PostOwner": user_Post.get("PostOwner"),\
+            "CreateTime": user_Post.get('CreateTime'),\
+            "Title": user_Post.get("Title"), \
+            "Text": user_Post.get("Text"), \
+            "Price": user_Post.get("Price"), \
+            "Auction": user_Post.get("Auction"),\
+            "LostFound": user_Post.get("LostFound"),\
+            "Images": user_Post.get("Images"),\
+            "Comments": user_Post.get('Comments')\
+        }
+        Posts.append(NewPost)
     
     return_data['Posts'] = Posts
     return_data["Success"] = True
