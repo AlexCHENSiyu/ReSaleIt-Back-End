@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*
 from flask import Flask, request, Blueprint
 import pymongo
 import numpy as np
@@ -15,6 +14,7 @@ from email.utils import formataddr
 from random import randint
 from operator import itemgetter
 from collections import Counter
+
 
 # Helper function
 def mongodb_init():
@@ -195,6 +195,7 @@ def merge_lists(list1, list2, key):
 app = Flask(__name__)
 mongo = mongodb_init()
 db = get_db(mongo, 'chen_db')
+
 
 @app.route('/drop-table')
 # http://localhost:5000/drop_table
@@ -889,6 +890,7 @@ def GetPosts():
         return_data["Error"] = Error
         return return_data
     
+    # 检查数量
     Num = request.args.get("Num")
     if Num: # not null
         Num = int(Num)
@@ -897,7 +899,7 @@ def GetPosts():
             return_data["Error"] = "Parameter Num is not in valid range."
             return return_data
     else:
-        Num = 6
+        Num = 6 # default value
     
     Keyword = request.args.get('Keyword')
     if Keyword:
@@ -914,16 +916,15 @@ def GetPosts():
             scored_Posts = db.Posts.find({"$text":{"$search": Fields}, "Deleted": {"$ne": True}},{"Score":{"$meta": "textScore"}}).limit(Num) # 返回最多十条未被删除的posts
             scored_Posts = sorted(scored_Posts, key=itemgetter('Score'), reverse=True) # 降序排序
         else:
-            # 用户没有设置喜欢的领域
+            # 用户没有设置喜欢的领域,随机返回帖子
             count = db.Posts.count_documents({'Deleted': {'$ne': True}})
             if count > Num:
                 scored_Posts = db.Posts.aggregate([ {'$match': {'Deleted': {'$ne': True}}}, {'$sample': {'size': Num}} ])
             else:
                 scored_Posts = db.Posts.aggregate([ {'$match': {'Deleted': {'$ne': True}}}, {'$sample': {'size': count}} ])
     
-    for scored_Post in scored_Posts:
-        # 检查帖子是否被删除
-        if scored_Post.get("Deleted") == False:
+    if scored_Posts:
+        for scored_Post in scored_Posts:
             NewPost = \
             {
                 "PID": str(scored_Post['_id']), \
@@ -1020,9 +1021,9 @@ def GetPostHistory():
         Error = "Did not find account. Please try it again!"
         return Success, Error
     
-    PostHistory = UserInfo.get('PostHistory')
     PostHistory_new = []
-    hasInvalidPID = False 
+    hasInvalidPID = False
+    PostHistory = UserInfo.get('PostHistory')
     if PostHistory:
         # 该用户已有浏览记录
         for PID in PostHistory:
@@ -1054,6 +1055,8 @@ def GetPostHistory():
     return_data["Success"] = True
 
     return return_data
+
+
 
 
 if __name__ == '__main__':
