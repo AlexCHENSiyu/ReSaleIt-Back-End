@@ -627,6 +627,8 @@ def GetMessages():
     for Message in Messages:
         msgLen += 1
         UserInfo_sender = db.UserInfos.find_one({'EmailAddress': Message['Sender']})
+        NickName_sender = None
+        HeadPortrait_sender = None
         if UserInfo_sender:
             # 发送者存在账户
             NickName_sender = UserInfo_sender.get('NickName')
@@ -772,22 +774,23 @@ def UserPosts():
         return return_data
     
     # 查照所有该用户没有被删除的帖子
-    user_Posts = db.Posts.find({"PostOwner":EmailAddress, 'Deleted': {'$ne': True}}).limit(10)
-    for user_Post in user_Posts:
-        NewPost = \
-        {
-            "PID": str(user_Post['_id']), \
-            "PostOwner": user_Post.get("PostOwner"),\
-            "CreateTime": user_Post.get('CreateTime'),\
-            "Title": user_Post.get("Title"), \
-            "Text": user_Post.get("Text"), \
-            "Price": user_Post.get("Price"), \
-            "Auction": user_Post.get("Auction"),\
-            "LostFound": user_Post.get("LostFound"),\
-            "Images": user_Post.get("Images"),\
-            "Comments": user_Post.get('Comments')\
-        }
-        Posts.append(NewPost)
+    user_Posts = db.Posts.find({"PostOwner":EmailAddress, 'Deleted': {'$ne': True}}).limit(6)
+    if user_Posts:
+        for user_Post in user_Posts:
+            NewPost = \
+            {
+                "PID": str(user_Post['_id']), \
+                "PostOwner": user_Post.get("PostOwner"),\
+                "CreateTime": user_Post.get('CreateTime'),\
+                "Title": user_Post.get("Title"), \
+                "Text": user_Post.get("Text"), \
+                "Price": user_Post.get("Price"), \
+                "Auction": user_Post.get("Auction"),\
+                "LostFound": user_Post.get("LostFound"),\
+                "Images": user_Post.get("Images"),\
+                "Comments": user_Post.get('Comments')\
+            }
+            Posts.append(NewPost)
     
     return_data['Posts'] = Posts
     return_data["Success"] = True
@@ -894,7 +897,7 @@ def GetPosts():
             return_data["Error"] = "Parameter Num is not in valid range."
             return return_data
     else:
-        Num = 10
+        Num = 6
     
     Keyword = request.args.get('Keyword')
     if Keyword:
@@ -913,12 +916,11 @@ def GetPosts():
         else:
             # 用户没有设置喜欢的领域
             count = db.Posts.count_documents({'Deleted': {'$ne': True}})
-            print("count:", count)
             if count > Num:
                 scored_Posts = db.Posts.aggregate([ {'$match': {'Deleted': {'$ne': True}}}, {'$sample': {'size': Num}} ])
             else:
                 scored_Posts = db.Posts.aggregate([ {'$match': {'Deleted': {'$ne': True}}}, {'$sample': {'size': count}} ])
-                
+    
     for scored_Post in scored_Posts:
         # 检查帖子是否被删除
         if scored_Post.get("Deleted") == False:
@@ -1019,12 +1021,13 @@ def GetPostHistory():
         return Success, Error
     
     PostHistory = UserInfo.get('PostHistory')
+    PostHistory_new = []
+    hasInvalidPID = False 
     if PostHistory:
         # 该用户已有浏览记录
-        print(PostHistory)
         for PID in PostHistory:
-            Post = db.Posts.find_one({'_id': ObjectId(PID)})
-            if Post.get("Deleted") == False:
+            Post = db.Posts.find_one({'_id': ObjectId(PID), "Deleted": {"$ne": True}})
+            if Post:
                 NewPost = \
                 {
                     "PID": str(Post['_id']), \
@@ -1040,7 +1043,13 @@ def GetPostHistory():
                     "Score": Post.get('Score')\
                 }
                 Posts.append(NewPost)
-                
+                PostHistory_new.append(PID)
+            else: 
+                # not found PID in db.
+                hasInvalidPID = True
+        if hasInvalidPID:
+            db.Posts.update_one({'_id': ObjectId(PID)}, {"$set": {'PostHistory':PostHistory_new}})
+            
     return_data['Posts'] = Posts
     return_data["Success"] = True
 
