@@ -696,7 +696,7 @@ def NewPost():
         NewPost['Images'] = Images
     Price = request.json.get("Price")
     if Price:
-        NewPost['Price'] = Price
+        NewPost['Price'] = int(Price)
     Fields = request.json.get("Fields")
     if Fields:
         NewPost['Fields'] = Fields
