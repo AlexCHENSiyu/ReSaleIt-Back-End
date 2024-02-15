@@ -2,8 +2,10 @@ from flask import Flask, request, Blueprint
 import pymongo
 import numpy as np
 import json
+import os
 from bson import ObjectId
 #import base64
+import random
 from pymongo.database import Database 
 from datetime import date, datetime
 from datetime import datetime
@@ -14,7 +16,9 @@ from email.utils import formataddr
 from random import randint
 from operator import itemgetter
 from collections import Counter
-
+from openai import OpenAI
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.metrics.pairwise import cosine_similarity
 
 # Helper function
 def mongodb_init():
@@ -191,10 +195,83 @@ def merge_lists(list1, list2, key):
     return new_list
 
 
+class RS():
+    def __init__(self, db):
+        self.db = db
+        self.unique_fields = set()
+        self.data_Fields = {}
+        self.current_folder = os.path.dirname(os.path.abspath(__file__))
+        self.Fields_path = os.path.join(self.current_folder, 'Fields.json')
+        self.updata_Fields()
+        
+    def save_Fields(self):
+        # 保存到本地
+        Fields_data = {}
+        Fields_data['Fields'] = list(self.unique_fields)
+        with open(self.Fields_path, 'w', newline='') as json_file:
+            json.dump(Fields_data, json_file, indent=4)
+    
+    def gpt_classify(self, Title, Text, Fields_List):
+        # 创建一个对话以传递商品信息给GPT
+        system_msg = "You are a product classification assistant."
+        user_msg = f"Please put product named “{Title}” into one of the fields {Fields_List} according to the product description: {Text}. Answer me with only field name without quotation marks."
+        
+        client = OpenAI(api_key="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",)
+        
+        chat_completion = client.chat.completions.create(model="gpt-3.5-turbo",
+            messages=[{"role": "system", "content": system_msg}, {"role": "user", "content": user_msg}])
+        classify_result = chat_completion.choices[0].message.content
+        print(user_msg)
+        print(f"Product “{Title}” is classified into: {classify_result}")
+        return classify_result
+    
+    def updata_Fields(self):\
+        # 查看是否有本地保存的Fields文件
+        if os.path.exists(self.Fields_path):
+            with open(self.Fields_path, newline='') as json_file:
+                Fields_data = json.load(json_file)
+            self.unique_fields = set(Fields_data['Fields'])
+            return
+        
+        # 若没有本地文件，则从数据库更新帖子的应用领域
+        Posts = self.db.Posts.aggregate([ {'$match': {'Deleted': {'$ne': True}}}, {'$sample': {'size': 50}} ])
+        if Posts:
+            for Post in Posts:
+                self.data_Fields[str(Post['_id'])] = Post.get("Fields")
+        self.unique_fields = set(Field for Fields in self.data_Fields.values() for Field in Fields )
+        # 保存到本地
+        self.save_Fields()
+        
+    def add_Post(self, NewPost, _id):
+        if NewPost["Fields"]:
+            self.unique_fields.update(NewPost["Fields"])
+        classify_result = self.gpt_classify(NewPost["Title"], NewPost["Text"], self.unique_fields)
+        
+        if classify_result not in self.unique_fields:
+            self.unique_fields.add((classify_result))
+        self.save_Fields()
+            
+        if classify_result not in NewPost["Fields"]:
+            NewPost["Fields"].append(classify_result)
+        self.data_Fields[str(_id)] = NewPost["Fields"]
+        
+        # 更新领域
+        db.Posts.update_one({'_id': _id}, {"$set": {'Fields': NewPost["Fields"]}})
+    
+    def cosine_similarity_score(self, list1, list2): # 没用
+        vectorizer = TfidfVectorizer()
+        tfidf_matrix = vectorizer.fit_transform(list1 + list2)
+        cosine_sim = cosine_similarity(tfidf_matrix, tfidf_matrix)
+        similarity = cosine_sim[0][1]  # 取第一个字符串与第二个字符串的相似度
+        return similarity
+    
+
+
 # API below
 app = Flask(__name__)
 mongo = mongodb_init()
 db = get_db(mongo, 'chen_db')
+rs = RS(db)
 
 
 @app.route('/drop-table')
@@ -710,7 +787,8 @@ def NewPost():
     NewPost.update(TimeAttribute)   # 添加创建和更新时间
 
     _id = db.Posts.insert_one(NewPost).inserted_id # 添加新的post
-
+    rs.add_Post(NewPost, _id)
+    
     return_data["Success"] = True
     # return_data["PID"] = str(_id)
 
@@ -860,9 +938,9 @@ def GetPosts():
     # 文本索引结构:
     {
         "weights" : {
-            "Title" : 3,
-            "Text" : 2,
-            "Fields" : 1
+            "Title" : 10,
+            "Text" : 5,
+            "Fields" : 3
         },
         "name" : "TextIndex"
     }
@@ -901,22 +979,47 @@ def GetPosts():
     else:
         Num = 6 # default value
     
+    # 为了获取用户浏览记录作为推荐系统的测试
+    UserInfo = db.UserInfos.find_one({'EmailAddress': EmailAddress})
+    if not UserInfo:
+        # 此账户不存在
+        Success = False
+        Error = "Did not find account. Please try it again!"
+        return Success, Error
+    
     Keyword = request.args.get('Keyword')
     if Keyword:
-        # 用户提供了关键词：
-        scored_Posts = db.Posts.find({"$text":{"$search": Keyword}, "Deleted": {"$ne": True}}, {"Score":{"$meta": "textScore"}}).limit(Num) # 返回最多十条未被删除的posts
+        # 用户提供了关键词
+        scored_Posts = db.Posts.find({"$text":{"$search": Keyword}, "Deleted": {"$ne": True}}, {"Score":{"$meta": "textScore"}}).limit(Num) # 返回最多6条未被删除的有关posts
     else:
-        # 用户未提供关键词：
-        UserInfo = db.UserInfos.find_one({'EmailAddress': EmailAddress})
+        # 用户未提供关键词
+        unique_Fields = set()
+        
+        # 获取用户的浏览记录, 添加进入搜索列表
+        PostHistory = UserInfo.get('PostHistory')
+        if PostHistory:
+            # 该用户已有浏览记录
+            for PID in PostHistory:
+                Post = db.Posts.find_one({'_id': ObjectId(PID), "Deleted": {"$ne": True}})
+                if Post:
+                    user_Fields = Post.get('Fields')
+                    if user_Fields:
+                        unique_Fields.update(user_Fields)
+        
+        # 获取用户的喜好
         FavoriteFields = UserInfo.get('FavoriteFields')
         if FavoriteFields:
-            Fields = "" # 将用户所有的喜欢领域作为关键词检索
-            for Field in FavoriteFields:
-                Fields += ' ' + Field
-            scored_Posts = db.Posts.find({"$text":{"$search": Fields}, "Deleted": {"$ne": True}},{"Score":{"$meta": "textScore"}}).limit(Num) # 返回最多十条未被删除的posts
-            scored_Posts = sorted(scored_Posts, key=itemgetter('Score'), reverse=True) # 降序排序
+            unique_Fields.update(FavoriteFields)
+        
+        if len(unique_Fields) > 0:
+            # 有推荐的fields, 将用户所有的喜欢领域作为关键词检索
+            Fields_Str = ""
+            for Field in unique_Fields:
+                Fields_Str += ' ' + Field
+            scored_Posts = db.Posts.find({"$text":{"$search": Fields_Str}, "Deleted": {"$ne": True}}, {"Score":{"$meta": "textScore"}}) # 返回所有未被删除的有关posts
+            # scored_Posts = sorted(scored_Posts, key=itemgetter('Score'), reverse=True) # 降序排序
         else:
-            # 用户没有设置喜欢的领域,随机返回帖子
+            # 没有推荐的Fields,随机推荐,没有score
             count = db.Posts.count_documents({'Deleted': {'$ne': True}})
             if count > Num:
                 scored_Posts = db.Posts.aggregate([ {'$match': {'Deleted': {'$ne': True}}}, {'$sample': {'size': Num}} ])
@@ -925,6 +1028,9 @@ def GetPosts():
     
     if scored_Posts:
         for scored_Post in scored_Posts:
+            Score = scored_Post.get('Score')
+            if not Score:
+                Score = 0
             NewPost = \
             {
                 "PID": str(scored_Post['_id']), \
@@ -937,10 +1043,14 @@ def GetPosts():
                 "LostFound": scored_Post.get("LostFound"),\
                 "Images": scored_Post.get("Images"),\
                 "Comments": scored_Post.get('Comments'),\
-                "Score": scored_Post.get('Score')\
+                "Score": Score\
             }
             Posts.append(NewPost)
-
+    
+    if len(Posts) > Num: 
+        Posts = random.sample(Posts, Num) # 取样
+    Posts = sorted(Posts, key=lambda d: d['Score'], reverse=True) # 降序排序
+    
     return_data['Posts'] = Posts
     return_data["Success"] = True
 
