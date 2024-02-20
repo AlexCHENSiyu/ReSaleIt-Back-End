@@ -706,6 +706,7 @@ def NewPost():
     
     NewPost['PostOwner'] = PostOwner
     NewPost['Deleted'] = False
+    NewPost['IsSold'] = False
     TimeAttribute = get_time_attribute('create withour code')
     NewPost.update(TimeAttribute)   # 添加创建和更新时间
 
@@ -759,6 +760,40 @@ def DeletePost():
         return return_data
    
     return return_data
+
+@app.route('/sold-post', methods=['POST'])
+def soldPost():
+    return_data = {}
+
+    email_address = request.form.get("EmailAddress")
+    password = request.form.get('Password')
+    pid = request.form.get('PID')
+
+    # Authenticate user
+    success, error = check_password(email_address, password)
+    if not success:
+        return_data["Success"] = success
+        return_data["Error"] = error
+        return return_data
+
+    # Check if the post exists and is owned by the user
+    success, error = check_post(pid)
+    if not success:
+        return_data["Success"] = success
+        return_data["Error"] = error
+        return return_data
+
+    post = db.Posts.find_one({'_id': ObjectId(pid)})
+    if post and post.get('PostOwner') == email_address:
+        # Mark as sold
+        db.Posts.update_one({'_id': ObjectId(pid)}, {"$set": {'IsSold': True}})
+        return_data["Success"] = True
+    else:
+        return_data["Success"] = False
+        return_data["Error"] = "You are not the owner of this post or post does not exist."
+    
+    return return_data
+
 
 
 @app.route('/user-posts', methods=['GET'])
@@ -904,7 +939,7 @@ def GetPosts():
     Keyword = request.args.get('Keyword')
     if Keyword:
         # 用户提供了关键词：
-        scored_Posts = db.Posts.find({"$text":{"$search": Keyword}, "Deleted": {"$ne": True}}, {"Score":{"$meta": "textScore"}}).limit(Num) # 返回最多十条未被删除的posts
+        scored_Posts = db.Posts.find({"$text":{"$search": Keyword}, "Deleted": {"$ne": True}, "IsSold": {"$ne": True}}, {"Score":{"$meta": "textScore"}}).limit(Num) # 返回最多十条未被删除and not sold的posts
     else:
         # 用户未提供关键词：
         UserInfo = db.UserInfos.find_one({'EmailAddress': EmailAddress})
@@ -913,15 +948,15 @@ def GetPosts():
             Fields = "" # 将用户所有的喜欢领域作为关键词检索
             for Field in FavoriteFields:
                 Fields += ' ' + Field
-            scored_Posts = db.Posts.find({"$text":{"$search": Fields}, "Deleted": {"$ne": True}},{"Score":{"$meta": "textScore"}}).limit(Num) # 返回最多十条未被删除的posts
+            scored_Posts = db.Posts.find({"$text":{"$search": Fields}, "Deleted": {"$ne": True}, "IsSold": {"$ne": True}},{"Score":{"$meta": "textScore"}}).limit(Num) # 返回最多十条未被删除and not sold的posts
             scored_Posts = sorted(scored_Posts, key=itemgetter('Score'), reverse=True) # 降序排序
         else:
             # 用户没有设置喜欢的领域,随机返回帖子
-            count = db.Posts.count_documents({'Deleted': {'$ne': True}})
+            count = db.Posts.count_documents({'Deleted': {'$ne': True}, "IsSold": {"$ne": True}})
             if count > Num:
-                scored_Posts = db.Posts.aggregate([ {'$match': {'Deleted': {'$ne': True}}}, {'$sample': {'size': Num}} ])
+                scored_Posts = db.Posts.aggregate([ {'$match': {'Deleted': {'$ne': True}, "IsSold": {"$ne": True}}}, {'$sample': {'size': Num}} ])
             else:
-                scored_Posts = db.Posts.aggregate([ {'$match': {'Deleted': {'$ne': True}}}, {'$sample': {'size': count}} ])
+                scored_Posts = db.Posts.aggregate([ {'$match': {'Deleted': {'$ne': True}, "IsSold": {"$ne": True}}}, {'$sample': {'size': count}} ])
     
     if scored_Posts:
         for scored_Post in scored_Posts:
