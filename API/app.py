@@ -62,11 +62,11 @@ def send_valid_code(email_address, code):
     sender_name = '[Campus-Transaction] Team'  # 发件人名称
     my_sender = 'schendf@163.com'  # 发件者邮箱
     content = "Dear user:\n\n \
-              We have received your request for a one-time code for your Campus-Transaction account.\n\n \
-              Your Campus-Transaction Validation code is {0}.\n\n \
+              We have received your request for a one-time code for your ReSaleIt account.\n\n \
+              Your ReSaleIt Validation code is {0}.\n\n \
               If you did not request this code, you can safely ignore this email. Someone may have mistyped your email address.\n\n \
               Thank you for using!\n\n \
-              Campus-Transaction team\n".format(code)  # 内容
+              ReSaleIt team\n".format(code)  # 内容
     success = True
     err = 'None'
 
@@ -783,6 +783,7 @@ def NewPost():
     
     NewPost['PostOwner'] = PostOwner
     NewPost['Deleted'] = False
+    NewPost['IsSold'] = False
     TimeAttribute = get_time_attribute('create withour code')
     NewPost.update(TimeAttribute)   # 添加创建和更新时间
 
@@ -836,6 +837,41 @@ def DeletePost():
         return_data["Error"] = 'You are not the owner of this post!'
         return return_data
    
+    return return_data
+
+
+@app.route('/sold-post', methods=['POST'])
+# http://localhost:5000/sold-post
+def soldPost():
+    return_data = {}
+
+    email_address = request.form.get("EmailAddress")
+    password = request.form.get('Password')
+    pid = request.form.get('PID')
+
+    # Authenticate user
+    success, error = check_password(email_address, password)
+    if not success:
+        return_data["Success"] = success
+        return_data["Error"] = error
+        return return_data
+
+    # Check if the post exists and is owned by the user
+    success, error = check_post(pid)
+    if not success:
+        return_data["Success"] = success
+        return_data["Error"] = error
+        return return_data
+
+    post = db.Posts.find_one({'_id': ObjectId(pid)})
+    if post and post.get('PostOwner') == email_address:
+        # Mark as sold
+        db.Posts.update_one({'_id': ObjectId(pid)}, {"$set": {'IsSold': True}})
+        return_data["Success"] = True
+    else:
+        return_data["Success"] = False
+        return_data["Error"] = "You are not the owner of this post or post does not exist."
+    
     return return_data
 
 
@@ -990,7 +1026,7 @@ def GetPosts():
     Keyword = request.args.get('Keyword')
     if Keyword:
         # 用户提供了关键词
-        scored_Posts = db.Posts.find({"$text":{"$search": Keyword}, "Deleted": {"$ne": True}}, {"Score":{"$meta": "textScore"}}).limit(Num) # 返回最多6条未被删除的有关posts
+        scored_Posts = db.Posts.find({"$text":{"$search": Keyword}, "Deleted": {"$ne": True}, "IsSold": {"$ne": True}}, {"Score":{"$meta": "textScore"}}).limit(Num) # 返回最多6条未被删除的有关posts
     else:
         # 用户未提供关键词
         unique_Fields = set()
@@ -1000,7 +1036,7 @@ def GetPosts():
         if PostHistory:
             # 该用户已有浏览记录
             for PID in PostHistory:
-                Post = db.Posts.find_one({'_id': ObjectId(PID), "Deleted": {"$ne": True}})
+                Post = db.Posts.find_one({'_id': ObjectId(PID), "Deleted": {"$ne": True}, "IsSold": {"$ne": True}})
                 if Post:
                     user_Fields = Post.get('Fields')
                     if user_Fields:
@@ -1016,15 +1052,15 @@ def GetPosts():
             Fields_Str = ""
             for Field in unique_Fields:
                 Fields_Str += ' ' + Field
-            scored_Posts = db.Posts.find({"$text":{"$search": Fields_Str}, "Deleted": {"$ne": True}}, {"Score":{"$meta": "textScore"}}) # 返回所有未被删除的有关posts
+            scored_Posts = db.Posts.find({"$text":{"$search": Fields_Str}, "Deleted": {"$ne": True}, "IsSold": {"$ne": True}}, {"Score":{"$meta": "textScore"}}) # 返回所有未被删除的有关posts
             # scored_Posts = sorted(scored_Posts, key=itemgetter('Score'), reverse=True) # 降序排序
         else:
             # 没有推荐的Fields,随机推荐,没有score
-            count = db.Posts.count_documents({'Deleted': {'$ne': True}})
+            count = db.Posts.count_documents({'Deleted': {'$ne': True}, "IsSold": {"$ne": True}})
             if count > Num:
-                scored_Posts = db.Posts.aggregate([ {'$match': {'Deleted': {'$ne': True}}}, {'$sample': {'size': Num}} ])
+                scored_Posts = db.Posts.aggregate([ {'$match': {'Deleted': {'$ne': True}, "IsSold": {"$ne": True}}}, {'$sample': {'size': Num}} ])
             else:
-                scored_Posts = db.Posts.aggregate([ {'$match': {'Deleted': {'$ne': True}}}, {'$sample': {'size': count}} ])
+                scored_Posts = db.Posts.aggregate([ {'$match': {'Deleted': {'$ne': True}, "IsSold": {"$ne": True}}}, {'$sample': {'size': count}} ])
     
     if scored_Posts:
         for scored_Post in scored_Posts:
