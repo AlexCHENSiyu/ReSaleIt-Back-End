@@ -1055,6 +1055,75 @@ def GetPostHistory():
     return_data["Success"] = True
 
     return return_data
+@app.route('/edit-post', methods=['POST'])
+def EditPost():
+    return_data = {}
+    EmailAddress = request.form.get("EmailAddress")
+    Success, Error = check_email(EmailAddress)
+    if not Success:
+        return_data["Success"] = Success
+        return_data["Error"] = Error
+        return return_data
+
+    Password = request.form.get('Password')
+    Success,Error = check_password(EmailAddress,Password)
+    if not Success:
+        return_data["Success"] = Success
+        return_data["Error"] = Error
+        return return_data
+
+    PID = request.form.get('PID')
+    Success,Error = check_post(PID)
+    if not Success:
+        return_data["Success"] = Success
+        return_data["Error"] = Error
+        return return_data
+    new_content = request.form.get('NewContent')
+    PostOwner = request.json.get("PostOwner")
+    Post = db.Posts.find_one({'_id': ObjectId(PID)})
+    if Post:
+        current_post=\
+        {
+            "PID": str(Post[_id]),\
+            "PostOwner": Post.get("PostOwner"),\
+            "CreateTime": Post.get('CreateTime'),\
+            "Title": Post.get("Title"),\
+            "Text": Post.get("Text"),\
+            "Price": Post.get("Price"),\
+            "Auction": Post.get("Auction"),\
+            "LostFound": Post.get("LostFound"),\
+            "Images": Post.get("Images"),\
+            "Comments": Post.get('Comments'),\
+            "Score": Post.get('Score')\
+        }
+        Title = request.json.get("Title")
+        if Title:
+            NewPost['Title'] = Title
+        Text = request.json.get("Text")
+        if Text:
+            NewPost['Text'] = Text
+        Images = request.json.get("Images")
+        if Images:
+            NewPost['Images'] = Images
+        Price = request.json.get("Price")
+        if Price:
+            NewPost['Price'] = int(Price)
+        Fields = request.json.get("Fields")
+        if Fields:
+            NewPost['Fields'] = Fields
+        NewPost['Auction'] = request.json.get("Auction")
+        NewPost['LostFound'] = request.json.get("LostFound")
+        NewPost['PostOwner'] = PostOwner
+        NewPost['Deleted'] = False
+        TimeAttribute = get_time_attribute('create withour code')
+        NewPost.update(TimeAttribute) 
+        db.Posts.update_one({'_id': ObjectId(PID)}, {"$set": NewPost})
+        return_data["Success"] = True
+        return return_data
+
+
+        
+
 
 
 
