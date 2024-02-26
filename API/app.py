@@ -1,5 +1,5 @@
-ePost={}
-tr=1
+#ePost={}
+#tr=1
 from flask import Flask, request, Blueprint, session, jsonify
 import pymongo
 import numpy as np
@@ -198,6 +198,7 @@ app = Flask(__name__)
 mongo = mongodb_init()
 db = get_db(mongo, 'chen_db')
 app.secret_key = 'your_very_secret_key_here'
+temp=db['temp']
 
 
 
@@ -1063,17 +1064,21 @@ def GetPostHistory():
 def ParsingPID():
     return_data={}
     pid = request.form.get('PID')
-    session['PID'] = pid  # 将 PID 存储在会话中
+    data={'PID':pid,
+          'temp':0}
+    temp.insert_one(data)
+    #session['PID'] = pid  # 将 PID 存储在会话中
     return_data["Success"] = True
-    print(pid)
-    tr=9
-    print(tr)
+    #print(pid)
+    #tr=9
+    #print(tr)
     return return_data
 
 @app.route('/edit-post', methods=['POST'])
 def EditPost():
     return_data = {}
     #NewPost = {}
+    ePost={}
 
     
 
@@ -1104,6 +1109,9 @@ def EditPost():
     ePost['PostOwner'] = PostOwner
     ePost['Deleted'] = False
     print(ePost['Title'])
+    NewPost={'ePost':ePost,
+             'temp':1}
+    temp.insert_one(NewPost)
     
     return_data["Success"] = True
 
@@ -1112,12 +1120,13 @@ def EditPost():
 def FinalPost():
     return_data = {}
     NewPost = {}
-    print(tr)
+    
 
     
 
-    PID = session.get('PID')
-    print(PID)
+    PID = temp.find_one({'temp':0})['PID']
+    ePost = temp.find_one({'temp':1})['ePost']
+   
 
     
     Success,Error = check_post(PID)
@@ -1164,6 +1173,8 @@ def FinalPost():
         NewPost['PostOwner'] = PostOwner
         NewPost['Deleted'] = False
         '''
+        NewPost=ePost
+        '''
         NewPost['PostOwner'] = ePost['PostOwner']
 
         NewPost['Title'] = ePost['Title']
@@ -1178,13 +1189,14 @@ def FinalPost():
     
         NewPost['Auction'] = ePost['Auction']
         NewPost['LostFound'] = ePost['LostFound']
+        '''
         NewPost['Deleted'] = False
         TimeAttribute = get_time_attribute('create withour code')
         NewPost.update(TimeAttribute) 
         db.Posts.update_one({'_id': ObjectId(PID)}, {"$set": NewPost})
         return_data["Success"] = True
-        session.clear()
-        ePost={}
+        temp.delete_many({'temp':0})
+        temp.delete_many({'temp':1})
 
         return return_data
 
