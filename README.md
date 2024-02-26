@@ -1,3 +1,3 @@
 # COMP4521
 Android Application
-Kotlin code is not uploaded.
+This is the back-end code for ReSaleIt. Written in Python.
