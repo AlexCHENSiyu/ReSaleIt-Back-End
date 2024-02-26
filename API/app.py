@@ -1173,7 +1173,7 @@ def GetPostHistory():
     if PostHistory:
         # 该用户已有浏览记录
         for PID in PostHistory:
-            Post = db.Posts.find_one({'_id': ObjectId(PID), "Deleted": {"$ne": True}})
+            Post = db.Posts.find_one({'_id': ObjectId(PID), "Deleted": {"$ne": True}, "IsSold": {"$ne": True}})
             if Post:
                 NewPost = \
                 {
