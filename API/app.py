@@ -1,4 +1,6 @@
-from flask import Flask, request, Blueprint
+ePost={}
+tr=1
+from flask import Flask, request, Blueprint, session, jsonify
 import pymongo
 import numpy as np
 import json
@@ -195,6 +197,8 @@ def merge_lists(list1, list2, key):
 app = Flask(__name__)
 mongo = mongodb_init()
 db = get_db(mongo, 'chen_db')
+app.secret_key = 'your_very_secret_key_here'
+
 
 
 @app.route('/drop-table')
@@ -1055,21 +1059,74 @@ def GetPostHistory():
     return_data["Success"] = True
 
     return return_data
+@app.route('/parsing-pid', methods=['POST'])
+def ParsingPID():
+    return_data={}
+    pid = request.form.get('PID')
+    session['PID'] = pid  # 将 PID 存储在会话中
+    return_data["Success"] = True
+    print(pid)
+    tr=9
+    print(tr)
+    return return_data
+
 @app.route('/edit-post', methods=['POST'])
 def EditPost():
     return_data = {}
-    NewPost = {}
+    #NewPost = {}
 
     
 
-    PID = request.form.get('PID')
+    #PID = session.get('PID')
+
+    
+    
+    #new_content = request.json.get('NewContent')
+    PostOwner = request.json.get("PostOwner")
+
+    Title = request.json.get("Title")
+    if Title:
+            ePost['Title'] = Title
+    Text = request.json.get("Text")
+    if Text:
+            ePost['Text'] = Text
+    Images = request.json.get("Images")
+    if Images:
+            ePost['Images'] = Images
+    Price = request.json.get("Price")
+    if Price:
+            ePost['Price'] = int(Price)
+    Fields = request.json.get("Fields")
+    if Fields:
+            ePost['Fields'] = Fields
+    ePost['Auction'] = request.json.get("Auction")
+    ePost['LostFound'] = request.json.get("LostFound")
+    ePost['PostOwner'] = PostOwner
+    ePost['Deleted'] = False
+    print(ePost['Title'])
+    
+    return_data["Success"] = True
+
+    return return_data
+@app.route('/final-post', methods=['POST'])
+def FinalPost():
+    return_data = {}
+    NewPost = {}
+    print(tr)
+
+    
+
+    PID = session.get('PID')
+    print(PID)
+
+    
     Success,Error = check_post(PID)
     if not Success:
         return_data["Success"] = Success
         return_data["Error"] = Error
         return return_data
-    new_content = request.form.get('NewContent')
-    PostOwner = request.form.get("PostOwner")
+    #new_content = request.json.get('NewContent')
+    #PostOwner = request.json.get("PostOwner")
     Post = db.Posts.find_one({'_id': ObjectId(PID)})
     if Post:
         current_post=\
@@ -1086,31 +1143,50 @@ def EditPost():
             "Comments": Post.get('Comments'),\
             "Score": Post.get('Score')\
         }
-        Title = request.form.get("Title")
+        '''
+        Title = request.json.get("Title")
         if Title:
             NewPost['Title'] = Title
-        Text = request.form.get("Text")
+        Text = request.json.get("Text")
         if Text:
             NewPost['Text'] = Text
-        Images = request.form.get("Images")
+        Images = request.json.get("Images")
         if Images:
             NewPost['Images'] = Images
-        Price = request.form.get("Price")
+        Price = request.json.get("Price")
         if Price:
             NewPost['Price'] = int(Price)
-        Fields = request.form.get("Fields")
+        Fields = request.json.get("Fields")
         if Fields:
             NewPost['Fields'] = Fields
-        NewPost['Auction'] = request.form.get("Auction")
-        NewPost['LostFound'] = request.form.get("LostFound")
+        NewPost['Auction'] = request.json.get("Auction")
+        NewPost['LostFound'] = request.json.get("LostFound")
         NewPost['PostOwner'] = PostOwner
+        NewPost['Deleted'] = False
+        '''
+        NewPost['PostOwner'] = ePost['PostOwner']
+
+        NewPost['Title'] = ePost['Title']
+        NewPost['Text'] = ePost['Text']
+        
+    
+        NewPost['Images'] = ePost['Images']
+    
+        NewPost['Price'] = ePost['Price']
+    
+        NewPost['Fields'] = ePost['Fields']
+    
+        NewPost['Auction'] = ePost['Auction']
+        NewPost['LostFound'] = ePost['LostFound']
         NewPost['Deleted'] = False
         TimeAttribute = get_time_attribute('create withour code')
         NewPost.update(TimeAttribute) 
         db.Posts.update_one({'_id': ObjectId(PID)}, {"$set": NewPost})
         return_data["Success"] = True
-        return return_data
+        session.clear()
+        ePost={}
 
+        return return_data
 
         
 
