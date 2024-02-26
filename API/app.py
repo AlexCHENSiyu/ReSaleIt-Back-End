@@ -842,7 +842,7 @@ def DeletePost():
 
 @app.route('/sold-post', methods=['POST'])
 # http://localhost:5000/sold-post
-def soldPost():
+def SoldPost():
     return_data = {}
 
     email_address = request.form.get("EmailAddress")
