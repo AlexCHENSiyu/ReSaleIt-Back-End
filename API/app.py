@@ -1073,7 +1073,28 @@ def ParsingPID():
     #tr=9
     #print(tr)
     return return_data
-
+@app.route('/old-post', methods=['GET'])
+def OldPost():
+    return_data={}
+    PID = request.args.get('PID')
+    Post = db.Posts.find_one({'_id': ObjectId(PID)})
+    if Post:
+        current_post=\
+        {
+            "PID": str(Post['_id']),\
+            "PostOwner": Post.get("PostOwner"),\
+            "CreateTime": Post.get('CreateTime'),\
+            "Title": Post.get("Title"),\
+            "Text": Post.get("Text"),\
+            "Price": Post.get("Price"),\
+            "Auction": Post.get("Auction"),\
+            "LostFound": Post.get("LostFound"),\
+            "Images": Post.get("Images"),\
+            "Comments": Post.get('Comments'),\
+            "Score": Post.get('Score')\
+        }
+        return_data = current_post
+    return return_data
 @app.route('/edit-post', methods=['POST'])
 def EditPost():
     return_data = {}
