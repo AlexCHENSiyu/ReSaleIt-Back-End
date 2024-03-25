@@ -18,6 +18,7 @@ from operator import itemgetter
 from collections import Counter
 
 
+
 # Helper function
 def mongodb_init():
     # connect to mongodb
@@ -1220,7 +1221,23 @@ def FinalPost():
         temp.delete_many({'temp':1})
 
         return return_data
-
+@app.route('/true-edit-pid', methods=['POST'])
+def TrueEditPID():
+    return_data={}
+    NewPost={}
+    PID = request.form.get('PID')
+    post=request.form.get('Post')
+    post=json.loads(post)
+    NewPost=post
+    NewPost['Deleted'] = False
+    #print("The title is:")
+    #print(NewPost['Title'])
+    TimeAttribute = get_time_attribute('create withour code')
+    NewPost.update(TimeAttribute) 
+    db.Posts.update_one({'_id': ObjectId(PID)}, {"$set": NewPost})
+    return_data["Success"] = True
+    
+    return return_data
         
 
 
