@@ -271,6 +271,7 @@ class RS():
 app = Flask(__name__)
 mongo = mongodb_init()
 db = get_db(mongo, 'chen_db')
+db.Posts.create_index([("Location", pymongo.GEOSPHERE)])
 rs = RS(db)
 
 
@@ -751,7 +752,6 @@ def GetMessages():
 
 
 @app.route('/new-post', methods=['POST'])
-# http://localhost:5000/new-post
 def NewPost():
     return_data = {}
     NewPost = {}
@@ -780,6 +780,15 @@ def NewPost():
         NewPost['Fields'] = Fields
     NewPost['Auction'] = request.json.get("Auction")
     NewPost['LostFound'] = request.json.get("LostFound")
+
+    # Handle location coordinates
+    Latitude = request.json.get("Latitude")
+    Longitude = request.json.get("Longitude")
+    if Latitude and Longitude:
+        NewPost['Location'] = {
+            "type": "Point",
+            "coordinates": [Longitude, Latitude]
+        }
     
     NewPost['PostOwner'] = PostOwner
     NewPost['Deleted'] = False
@@ -791,7 +800,6 @@ def NewPost():
     rs.add_Post(NewPost, _id)
     
     return_data["Success"] = True
-    # return_data["PID"] = str(_id)
 
     return return_data
 
@@ -892,6 +900,9 @@ def UserPosts():
     user_Posts = db.Posts.find({"PostOwner":EmailAddress, 'Deleted': {'$ne': True}}).limit(6)
     if user_Posts:
         for user_Post in user_Posts:
+            coordinates = user_Post.get('Location', {}).get('coordinates', [None, None])
+            longitude = coordinates[0]
+            latitude = coordinates[1]
             NewPost = \
             {
                 "PID": str(user_Post['_id']), \
@@ -903,7 +914,9 @@ def UserPosts():
                 "Auction": user_Post.get("Auction"),\
                 "LostFound": user_Post.get("LostFound"),\
                 "Images": user_Post.get("Images"),\
-                "Comments": user_Post.get('Comments')\
+                "Comments": user_Post.get('Comments'),\
+                "Latitude": latitude,\
+                "Longitude": longitude\
             }
             Posts.append(NewPost)
     
@@ -1067,6 +1080,9 @@ def GetPosts():
             Score = scored_Post.get('Score')
             if not Score:
                 Score = 0
+            coordinates = scored_Post.get('Location', {}).get('coordinates', [None, None])
+            longitude = coordinates[0]
+            latitude = coordinates[1]
             NewPost = \
             {
                 "PID": str(scored_Post['_id']), \
@@ -1079,6 +1095,8 @@ def GetPosts():
                 "LostFound": scored_Post.get("LostFound"),\
                 "Images": scored_Post.get("Images"),\
                 "Comments": scored_Post.get('Comments'),\
+                "Latitude": latitude,\
+                "Longitude": longitude,\
                 "Score": Score\
             }
             Posts.append(NewPost)
@@ -1175,6 +1193,9 @@ def GetPostHistory():
         for PID in reversed(PostHistory):
             Post = db.Posts.find_one({'_id': ObjectId(PID), "Deleted": {"$ne": True}})
             if Post:
+                coordinates = Post.get('Location', {}).get('coordinates', [None, None])
+                longitude = coordinates[0]
+                latitude = coordinates[1]
                 NewPost = \
                 {
                     "PID": str(Post['_id']), \
@@ -1187,6 +1208,8 @@ def GetPostHistory():
                     "LostFound": Post.get("LostFound"),\
                     "Images": Post.get("Images"),\
                     "Comments": Post.get('Comments'),\
+                    "Latitude": latitude,\
+                    "Longitude": longitude,\
                     "Score": Post.get('Score')\
                 }
                 Posts.append(NewPost)
@@ -1204,8 +1227,7 @@ def GetPostHistory():
 
 
 
-
 if __name__ == '__main__':
     # db.Posts.drop_index("Title_Text")
-    app.run(host='localhost', port=8080, debug=True)
-    
+    # app.run(host='localhost', port=8080, debug=True)
+    app.run(host='0.0.0.0', port=8081, debug=True)
