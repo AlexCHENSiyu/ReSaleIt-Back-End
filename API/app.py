@@ -214,11 +214,11 @@ class RS():
     def gpt_classify(self, Title, Text, Fields_List):
         # 创建一个对话以传递商品信息给GPT
         system_msg = "You are a product classification assistant."
-        user_msg = f"Please put product named “{Title}” into one of the fields {Fields_List} according to the product description: {Text}. Answer me with only field name without quotation marks."
+        user_msg = f"Please put product named “{Title}” into one of the fields {Fields_List} according to the product description: {Text}. If no suitable fields, provide me with one new field. Answer me with only field name without quotation marks."
         
-        client = OpenAI(api_key="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",)
+        client = OpenAI(api_key="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",)
         
-        chat_completion = client.chat.completions.create(model="gpt-3.5-turbo",
+        chat_completion = client.chat.completions.create(model="gpt-4",
             messages=[{"role": "system", "content": system_msg}, {"role": "user", "content": user_msg}])
         classify_result = chat_completion.choices[0].message.content
         print(user_msg)
