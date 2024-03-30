@@ -1,4 +1,4 @@
-from flask import Flask, request, Blueprint
+from flask import Flask, request, Blueprint, jsonify
 import pymongo
 import numpy as np
 import json
@@ -1201,6 +1201,17 @@ def GetPostHistory():
     return_data["Success"] = True
 
     return return_data
+
+//notification_created = False
+//@app.route('/check_notification', methods=['GET'])
+//# http://localhost:5000/check_notification
+//def check_notification():
+//    global notification_created
+//    if notification_created:
+//        return jsonify({'notification_created': True}), 200
+//    else:
+//        return jsonify({'notification_created': False}), 200
+//
 
 
 
