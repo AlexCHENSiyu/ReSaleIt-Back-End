@@ -1202,16 +1202,16 @@ def GetPostHistory():
 
     return return_data
 
-//notification_created = False
-//@app.route('/check_notification', methods=['GET'])
-//# http://localhost:5000/check_notification
-//def check_notification():
-//    global notification_created
-//    if notification_created:
-//        return jsonify({'notification_created': True}), 200
-//    else:
-//        return jsonify({'notification_created': False}), 200
-//
+# //notification_created = False
+# //@app.route('/check_notification', methods=['GET'])
+# //# http://localhost:5000/check_notification
+# //def check_notification():
+# //    global notification_created
+# //    if notification_created:
+# //        return jsonify({'notification_created': True}), 200
+# //    else:
+# //        return jsonify({'notification_created': False}), 200
+
 
 
 

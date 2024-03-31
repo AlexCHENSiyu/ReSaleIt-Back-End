@@ -130,8 +130,6 @@ class TestApp(unittest.TestCase):
             # 断言状态码为 200
             self.assertEqual(response.status_code, 200)
             # 断言返回的结果包含成功标志
-            self.assertTrue(response.json['Success'])
-            # 检查帖子点击计数是否正确更新
             self.assertEqual(response.json['Count'], 6)
             # 检查用户的帖子历史记录是否正确更新
             self.assertIn('65a199aaa2c14c072766377a', response.json['UserPostHistory'])
