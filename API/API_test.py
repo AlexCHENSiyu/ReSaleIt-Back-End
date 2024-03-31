@@ -273,40 +273,40 @@ class TestApp(unittest.TestCase):
         except Exception as e:
             print("test_post_comment_no_text raised an error:", e)
 
-    # def test_get_posts_with_keyword(self):
-    #     try:
-    #         # 模拟请求数据，带有关键词
-    #         data = {
-    #             "EmailAddress": "1030920919@qq.com",
-    #             "Keyword": "test",
-    #             "Num": 6
-    #         }
-    #         # 发送请求
-    #         response = self.app.get('/get-posts', query_string=data)
-    #         # 断言状态码为 200
-    #         self.assertEqual(response.status_code, 200)
-    #         # 断言返回的结果包含成功标志和帖子列表
-    #         self.assertTrue(response.json['Success'])
-    #         self.assertTrue(response.json['Posts'])
-    #     except Exception as e:
-    #         print("test_get_posts_with_keyword raised an error:", e)
+    def test_get_posts_with_keyword(self):
+        try:
+            # 模拟请求数据，带有关键词
+            data = {
+                "EmailAddress": "1030920919@qq.com",
+                "Keyword": "test",
+                "Num": 6
+            }
+            # 发送请求
+            response = self.app.get('/get-posts', query_string=data)
+            # 断言状态码为 200
+            self.assertEqual(response.status_code, 200)
+            # 断言返回的结果包含成功标志和帖子列表
+            self.assertTrue(response.json['Success'])
+            self.assertTrue(response.json['Posts'])
+        except Exception as e:
+            print("test_get_posts_with_keyword raised an error:", e)
 
-    # def test_get_posts_without_keyword(self):
-    #     try:
-    #         # 模拟请求数据，不带关键词
-    #         data = {
-    #             "EmailAddress": "1030920919@qq.com",
-    #             "Num": 6
-    #         }
-    #         # 发送请求
-    #         response = self.app.get('/get-posts', query_string=data)
-    #         # 断言状态码为 200
-    #         self.assertEqual(response.status_code, 200)
-    #         # 断言返回的结果包含成功标志和帖子列表
-    #         self.assertTrue(response.json['Success'])
-    #         self.assertTrue(response.json['Posts'])
-    #     except Exception as e:
-    #         print("test_get_posts_without_keyword raised an error:", e)
+    def test_get_posts_without_keyword(self):
+        try:
+            # 模拟请求数据，不带关键词
+            data = {
+                "EmailAddress": "1030920919@qq.com",
+                "Num": 6
+            }
+            # 发送请求
+            response = self.app.get('/get-posts', query_string=data)
+            # 断言状态码为 200
+            self.assertEqual(response.status_code, 200)
+            # 断言返回的结果包含成功标志和帖子列表
+            self.assertTrue(response.json['Success'])
+            self.assertTrue(response.json['Posts'])
+        except Exception as e:
+            print("test_get_posts_without_keyword raised an error:", e)
 
 
 #     def test_notification_channel_set(self):
