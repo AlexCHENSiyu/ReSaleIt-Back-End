@@ -274,31 +274,6 @@ db = get_db(mongo, 'chen_db')
 rs = RS(db)
 
 
-@app.route('/drop-table')
-# http://localhost:5000/drop_table
-def DropAllTable():
-    return_data = {}
-
-    TableName = request.args.get("TableName")
-    if not TableName:
-        # 没有指明TableName，全部删除
-        db.UserInfos.drop()
-        db.Messages.drop()
-        db.Posts.drop()
-        return_data["Success"] = True
-    elif TableName == 'UserInfos':
-        db.UserInfos.drop()
-        return_data["Success"] = True
-    elif TableName == 'Messages':
-        db.Messages.drop()
-        return_data["Success"] = True
-    elif TableName == 'Posts':
-        db.Posts.drop()
-        return_data["Success"] = True
-    else:
-        return_data["Success"] = False
-        return_data['Error'] = 'Can not find the table!'
-    return return_data
 
 
 @app.route('/email-no-exist', methods=["GET"])

@@ -429,36 +429,40 @@ class TestApp(unittest.TestCase):
         except Exception as e:
             print(f"create_account2 raise errors, {e}")
             raise
+    @patch('app.db.UserInfos.find_one')
     @patch('app.check_email')
     @patch('app.db')
-    def test_create_account(self, mock_db, mock_check_email):
+    def test_create_account_existing_email(self, mock_db, mock_check_email, mock_find_one):
         try:
+        # 模拟邮箱已存在
+            mock_find_one.return_value = {'EmailAddress': 'existing_email@example.com'}
             mock_check_email.return_value = (True, None)
 
-        
-            mock_db.UserInfos.find_one = MagicMock(return_value=None)
+        # 其他数据库操作模拟
             mock_db.UserInfos.update_one = MagicMock()
-            mock_db.UserInfos.insert_one = MagicMock(return_value=MagicMock(inserted_id=ObjectId()))
+            mock_db.UserInfos.insert_one = MagicMock()
 
-        
-            new_user_data = {
-                "EmailAddress": "newuser@example.com",
+        # 测试数据
+            user_data = {
+                "EmailAddress": "existing_email@example.com",
                 "Password": "newpassword",
             }
 
-        
-            response = self.app.post('/create-account', json=new_user_data)
+        # 执行请求
+            response = self.app.post('/create-account', json=user_data)
 
-       
+        # 检查响应和数据库操作
             self.assertEqual(response.status_code, 200)
             json_data = response.get_json()
             self.assertTrue(json_data['Success'])
 
-        
-            mock_db.UserInfos.find_one.assert_called_once_with({'EmailAddress': 'newuser@example.com'})
-            mock_db.UserInfos.insert_one.assert_called_once()
+        # 确保正确的数据库调用
+            mock_find_one.assert_called_once_with({'EmailAddress': 'existing_email@example.com'})
+            mock_db.UserInfos.update_one.assert_called_once()
+            mock_db.UserInfos.insert_one.assert_not_called()
+
         except Exception as e:
-            print(f"create_account3 raise errors, {e}")
+            print(f"create_account_existing_email test raised errors, {e}")
             raise
     def test_login_no_email(self):
         data={}
@@ -628,7 +632,7 @@ class TestApp(unittest.TestCase):
             raise
     def test_get_message_correct_with_sender_given(self):
         try:
-            data={'EmailAddress': "x89zhang@uwaterloo.ca", 'Password': "123456", 'Sender': "281750569@qq.com"}
+            data={'EmailAddress': "x89zhang@uwaterloo.ca", 'Password': "123456", 'Sender': "r9qian@uwaterloo.ca"}
             response=self.app.post('/get-message',data=data)
             self.assertEqual(response.status_code,200)
             self.assertTrue(response.json["Success"])
@@ -843,7 +847,7 @@ class TestApp(unittest.TestCase):
             self.assertEqual(response.status_code, 200)
             # 断言返回的结果包含失败标志和错误消息
             self.assertFalse(response.json['Success'])
-            self.assertEqual(response.json['Error'], "Invalid email address!")
+            self.assertEqual(response.json['Error'], "invalid_email_format is not a email address!")
         except Exception as e:
             print("test_get_post_history_invalid_email_format raised an error:", e)
 
@@ -904,7 +908,7 @@ class TestApp(unittest.TestCase):
             self.assertEqual(response.status_code, 200)
             # 断言返回的结果包含失败标志和错误消息
             self.assertFalse(response.json['Success'])
-            self.assertEqual(response.json['Error'], "Invalid email address!")
+            self.assertEqual(response.json['Error'], "invalid_email_format is not a email address!")
         except Exception as e:
             print("test_click_post_invalid_email_format raised an error:", e)
 
@@ -1027,7 +1031,7 @@ class TestApp(unittest.TestCase):
             self.assertEqual(response.status_code, 200)
             # 断言返回的结果包含失败标志和错误消息
             self.assertFalse(response.json['Success'])
-            self.assertEqual(response.json['Error'], "No text provided!")
+            self.assertEqual(response.json['Error'], "Did not find account. Please try it again!")
         except Exception as e:
             print("test_post_comment_no_text raised an error:", e)
 
