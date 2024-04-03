@@ -19,6 +19,7 @@ from collections import Counter
 from openai import OpenAI
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
+from haversine import haversine, Unit
 
 # Helper function
 def mongodb_init():
@@ -212,18 +213,22 @@ class RS():
             json.dump(Fields_data, json_file, indent=4)
     
     def gpt_classify(self, Title, Text, Fields_List):
-        # 创建一个对话以传递商品信息给GPT
-        system_msg = "You are a product classification assistant."
-        user_msg = f"Please put product named “{Title}” into one of the fields {Fields_List} according to the product description: {Text}. Answer me with only field name without quotation marks."
-        
-        client = OpenAI(api_key="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",)
-        
-        chat_completion = client.chat.completions.create(model="gpt-3.5-turbo",
-            messages=[{"role": "system", "content": system_msg}, {"role": "user", "content": user_msg}])
-        classify_result = chat_completion.choices[0].message.content
-        print(user_msg)
-        print(f"Product “{Title}” is classified into: {classify_result}")
-        return classify_result
+        try:
+            # 创建一个对话以传递商品信息给GPT
+            system_msg = "You are a product classification assistant."
+            user_msg = f"Please put product named “{Title}” into one of the fields {Fields_List} according to the product description: {Text}. If no suitable fields, provide me with one new field. Answer me with only field name without quotation marks."
+            
+            client = OpenAI(api_key="",)
+            
+            chat_completion = client.chat.completions.create(model="gpt-4",
+                messages=[{"role": "system", "content": system_msg}, {"role": "user", "content": user_msg}])
+            classify_result = chat_completion.choices[0].message.content
+            # print(user_msg)
+            # print(f"Product “{Title}” is classified into: {classify_result}")
+            return classify_result
+        except:
+            print("Error: Invalid api_key.")
+            return None
     
     def updata_Fields(self):\
         # 查看是否有本地保存的Fields文件
@@ -243,17 +248,21 @@ class RS():
         self.save_Fields()
         
     def add_Post(self, NewPost, _id):
-        if NewPost["Fields"]:
-            self.unique_fields.update(NewPost["Fields"])
+        Fields = NewPost.get("Fields")
+        if Fields:
+            self.unique_fields.update(Fields)
+        else:
+            NewPost["Fields"] = []
         classify_result = self.gpt_classify(NewPost["Title"], NewPost["Text"], self.unique_fields)
         
-        if classify_result not in self.unique_fields:
-            self.unique_fields.add((classify_result))
-        self.save_Fields()
+        if classify_result:
+            if classify_result not in self.unique_fields:
+                self.unique_fields.add((classify_result))
+            self.save_Fields()
             
-        if classify_result not in NewPost["Fields"]:
-            NewPost["Fields"].append(classify_result)
-        self.data_Fields[str(_id)] = NewPost["Fields"]
+            if classify_result not in NewPost["Fields"]:
+                NewPost["Fields"].append(classify_result)
+            self.data_Fields[str(_id)] = NewPost["Fields"]
         
         # 更新领域
         db.Posts.update_one({'_id': _id}, {"$set": {'Fields': NewPost["Fields"]}})
@@ -268,14 +277,14 @@ class RS():
 
 
 # API below
-app = Flask(__name__)
+api = Flask(__name__)
 mongo = mongodb_init()
 db = get_db(mongo, 'chen_db')
 db.Posts.create_index([("Location", pymongo.GEOSPHERE)])
 rs = RS(db)
 
 
-@app.route('/drop-table')
+@api.route('/drop-table')
 # http://localhost:5000/drop_table
 def DropAllTable():
     return_data = {}
@@ -302,7 +311,7 @@ def DropAllTable():
     return return_data
 
 
-@app.route('/email-no-exist', methods=["GET"])
+@api.route('/email-no-exist', methods=["GET"])
 # http://localhost:8080/email-no-exist?EmailAddress=1030920919@qq.com
 def EmailNoExist():
     return_data = {}
@@ -335,7 +344,7 @@ def EmailNoExist():
     
     return return_data
 
-@app.route('/email-validation', methods=["GET"])
+@api.route('/email-validation', methods=["GET"])
 # http://localhost:5000/email-validation?EmailAddress=1030920919@qq.com
 # http://localhost:5000/email-validation?EmailAddress=1030920919@qq.com&InputCode=123456
 # http://16.162.42.168/chen/email-validation?EmailAddress=1030920919@qq.com
@@ -413,7 +422,7 @@ def EmailValidation():
     return return_data
 
 
-@app.route('/set-reset-password', methods=['POST'])
+@api.route('/set-reset-password', methods=['POST'])
 # http://localhost:5000/set-reset-password
 def SetResetPassword():
     return_data = {}
@@ -476,7 +485,7 @@ def SetResetPassword():
     return return_data
 
 
-@app.route('/create-account', methods=['POST'])
+@api.route('/create-account', methods=['POST'])
 # http://localhost:5000/create-account
 def CreateAccount():
     return_data = {}
@@ -550,7 +559,7 @@ def CreateAccount():
     return return_data
 
 
-@app.route('/login', methods=['POST'])
+@api.route('/login', methods=['POST'])
 # http://localhost:5000/login
 def Login():
     return_data = {}
@@ -574,7 +583,7 @@ def Login():
     return return_data
 
 
-@app.route('/get-user-info', methods=['GET'])
+@api.route('/get-user-info', methods=['GET'])
 # http://localhost:5000/get-user-info
 def GetUserInfo():
     return_data = {}
@@ -604,7 +613,7 @@ def GetUserInfo():
     return return_data
 
 
-@app.route('/send-message', methods=['POST'])
+@api.route('/send-message', methods=['POST'])
 # http://localhost:5000/send-message
 def SendMessage():
     return_data = {}
@@ -673,7 +682,7 @@ def SendMessage():
     return return_data
 
 
-@app.route('/get-message', methods=['POST'])
+@api.route('/get-message', methods=['POST'])
 # http://localhost:5000/get-message
 def GetMessages():
     return_data = {}
@@ -751,7 +760,7 @@ def GetMessages():
     return return_data
 
 
-@app.route('/new-post', methods=['POST'])
+@api.route('/new-post', methods=['POST'])
 def NewPost():
     return_data = {}
     NewPost = {}
@@ -804,7 +813,7 @@ def NewPost():
     return return_data
 
 
-@app.route('/delete-post', methods=['POST'])
+@api.route('/delete-post', methods=['POST'])
 # http://localhost:5000/delete-post
 def DeletePost():
     return_data = {}
@@ -848,7 +857,7 @@ def DeletePost():
     return return_data
 
 
-@app.route('/sold-post', methods=['POST'])
+@api.route('/sold-post', methods=['POST'])
 # http://localhost:5000/sold-post
 def SoldPost():
     return_data = {}
@@ -883,7 +892,7 @@ def SoldPost():
     return return_data
 
 
-@app.route('/user-posts', methods=['GET'])
+@api.route('/user-posts', methods=['GET'])
 # http://localhost:5000/user-posts?EmailAddress=1030920919@qq.com
 def UserPosts():
     return_data = {}
@@ -926,7 +935,7 @@ def UserPosts():
     return return_data
 
 
-@app.route('/post-comment', methods=['POST'])
+@api.route('/post-comment', methods=['POST'])
 # http://localhost:5000/post-comment
 def PostComment():
     return_data = {}
@@ -980,34 +989,12 @@ def PostComment():
     return return_data
 
 
-@app.route('/get-posts', methods=['GET'])
-# http://localhost:5000/get-posts
+from haversine import haversine, Unit
+
+@api.route('/get-posts', methods=['GET'])
 def GetPosts():
-    '''
-    # 文本索引结构:
-    {
-        "weights" : {
-            "Title" : 10,
-            "Text" : 5,
-            "Fields" : 3
-        },
-        "name" : "TextIndex"
-    }
-
-    # db.Posts.create_index( [("Title":"text", pymongo.ASCENDING),("Text":"text", pymongo.ASCENDING)]) # 索引
-    # db.Posts.create_index( { "Title": "text", "Text":"text"} ) # 索引
-    
-    indexs = db.Posts.list_indexes()
-    for index in indexs:
-        print(index)
-
-    # mongodb 全文索引的特点：
-        # 它主要匹配的是有意义的单词，忽略大小写，忽略单复数，忽略时态等。关于全文索引也有文档说明，请仔细阅读，它是跟普通索引完全不一样的一种索引形式。
-        # 另外全文索引虽然一个表只能有一个，但是却可以为不同的字段设置不同的权重，最终计算出一个匹配度的得分。
-    '''
-    
     return_data = {}
-    Posts=[]
+    Posts = []
 
     # 检查邮箱
     EmailAddress = request.args.get("EmailAddress")
@@ -1016,65 +1003,80 @@ def GetPosts():
         return_data["Success"] = Success
         return_data["Error"] = Error
         return return_data
-    
+
     # 检查数量
     Num = request.args.get("Num")
-    if Num: # not null
+    if Num:
         Num = int(Num)
         if Num <= 0 and Num > 10:
             return_data["Success"] = False
             return_data["Error"] = "Parameter Num is not in valid range."
             return return_data
     else:
-        Num = 6 # default value
-    
+        Num = 6
+
+    # 获取搜索半径
+    Radius = request.args.get("Radius")
+    if Radius:
+        Radius = int(Radius)
+        UseSearchRadius = True
+    else:
+        UseSearchRadius = False
+
+    # 获取用户位置
+    Longitude = request.args.get("Longitude")
+    Latitude = request.args.get("Latitude")
+
+    print(f"GetPosts - EmailAddress: {EmailAddress}")
+    print(f"GetPosts - UseSearchRadius: {UseSearchRadius}")
+    print(f"GetPosts - Radius: {Radius}")
+    print(f"GetPosts - Longitude: {Longitude}")
+    print(f"GetPosts - Latitude: {Latitude}")
+
     # 为了获取用户浏览记录作为推荐系统的测试
     UserInfo = db.UserInfos.find_one({'EmailAddress': EmailAddress})
     if not UserInfo:
-        # 此账户不存在
         Success = False
         Error = "Did not find account. Please try it again!"
         return Success, Error
-    
+
     Keyword = request.args.get('Keyword')
     if Keyword:
         # 用户提供了关键词
-        scored_Posts = db.Posts.find({"$text":{"$search": Keyword}, "Deleted": {"$ne": True}, "IsSold": {"$ne": True}}, {"Score":{"$meta": "textScore"}}).limit(Num) # 返回最多6条未被删除的有关posts
+        scored_Posts = db.Posts.find({"$text": {"$search": Keyword}, "Deleted": {"$ne": True}, "IsSold": {"$ne": True}}, {"Score": {"$meta": "textScore"}}).limit(Num)
     else:
         # 用户未提供关键词
         unique_Fields = set()
-        
+
         # 获取用户的浏览记录, 添加进入搜索列表
         PostHistory = UserInfo.get('PostHistory')
         if PostHistory:
-            # 该用户已有浏览记录
             for PID in PostHistory:
                 Post = db.Posts.find_one({'_id': ObjectId(PID), "Deleted": {"$ne": True}, "IsSold": {"$ne": True}})
                 if Post:
                     user_Fields = Post.get('Fields')
                     if user_Fields:
                         unique_Fields.update(user_Fields)
-        
+
         # 获取用户的喜好
         FavoriteFields = UserInfo.get('FavoriteFields')
         if FavoriteFields:
             unique_Fields.update(FavoriteFields)
-        
+
         if len(unique_Fields) > 0:
             # 有推荐的fields, 将用户所有的喜欢领域作为关键词检索
             Fields_Str = ""
             for Field in unique_Fields:
                 Fields_Str += ' ' + Field
-            scored_Posts = db.Posts.find({"$text":{"$search": Fields_Str}, "Deleted": {"$ne": True}, "IsSold": {"$ne": True}}, {"Score":{"$meta": "textScore"}}) # 返回所有未被删除的有关posts
-            # scored_Posts = sorted(scored_Posts, key=itemgetter('Score'), reverse=True) # 降序排序
+            scored_Posts = db.Posts.find({"$text": {"$search": Fields_Str}, "Deleted": {"$ne": True}, "IsSold": {"$ne": True}}, {"Score": {"$meta": "textScore"}})
         else:
             # 没有推荐的Fields,随机推荐,没有score
             count = db.Posts.count_documents({'Deleted': {'$ne': True}, "IsSold": {"$ne": True}})
             if count > Num:
-                scored_Posts = db.Posts.aggregate([ {'$match': {'Deleted': {'$ne': True}, "IsSold": {"$ne": True}}}, {'$sample': {'size': Num}} ])
+                scored_Posts = db.Posts.aggregate([{'$match': {'Deleted': {'$ne': True}, "IsSold": {"$ne": True}}}, {'$sample': {'size': Num}}])
             else:
-                scored_Posts = db.Posts.aggregate([ {'$match': {'Deleted': {'$ne': True}, "IsSold": {"$ne": True}}}, {'$sample': {'size': count}} ])
-    
+                scored_Posts = db.Posts.aggregate([{'$match': {'Deleted': {'$ne': True}, "IsSold": {"$ne": True}}}, {'$sample': {'size': count}}])
+
     if scored_Posts:
         for scored_Post in scored_Posts:
             Score = scored_Post.get('Score')
@@ -1083,35 +1085,70 @@ def GetPosts():
             coordinates = scored_Post.get('Location', {}).get('coordinates', [None, None])
             longitude = coordinates[0]
             latitude = coordinates[1]
-            NewPost = \
-            {
-                "PID": str(scored_Post['_id']), \
-                "PostOwner": scored_Post.get("PostOwner"),\
-                "CreateTime": scored_Post.get('CreateTime'),\
-                "Title": scored_Post.get("Title"), \
-                "Text": scored_Post.get("Text"), \
-                "Price": scored_Post.get("Price"),\
-                "Auction": scored_Post.get("Auction"),\
-                "LostFound": scored_Post.get("LostFound"),\
-                "Images": scored_Post.get("Images"),\
-                "Comments": scored_Post.get('Comments'),\
-                "Latitude": latitude,\
-                "Longitude": longitude,\
-                "Score": Score\
-            }
-            Posts.append(NewPost)
-    
-    if len(Posts) > Num: 
-        Posts = random.sample(Posts, Num) # 取样
-    Posts = sorted(Posts, key=lambda d: d['Score'], reverse=True) # 降序排序
-    
+
+            print(f"GetPosts - Processing Post: {scored_Post['_id']}")
+            print(f"GetPosts - Post Longitude: {longitude}")
+            print(f"GetPosts - Post Latitude: {latitude}")
+
+            if UseSearchRadius:
+                if Longitude and Latitude and longitude and latitude:
+                    distance = haversine((float(Latitude), float(Longitude)), (latitude, longitude), unit=Unit.KILOMETERS)
+                    print(f"GetPosts - Distance: {distance} km")
+                    print(f"GetPosts - Search Radius: {Radius} km")
+                    if distance <= Radius:
+                        print(f"GetPosts - Post within search radius: {scored_Post['_id']}")
+                        NewPost = {
+                            "PID": str(scored_Post['_id']),
+                            "PostOwner": scored_Post.get("PostOwner"),
+                            "CreateTime": scored_Post.get('CreateTime'),
+                            "Title": scored_Post.get("Title"),
+                            "Text": scored_Post.get("Text"),
+                            "Price": scored_Post.get("Price"),
+                            "Auction": scored_Post.get("Auction"),
+                            "LostFound": scored_Post.get("LostFound"),
+                            "Images": scored_Post.get("Images"),
+                            "Comments": scored_Post.get('Comments'),
+                            "Latitude": latitude,
+                            "Longitude": longitude,
+                            "Score": Score
+                        }
+                        Posts.append(NewPost)
+                    else:
+                        print(f"GetPosts - Post outside search radius: {scored_Post['_id']}")
+                else:
+                    print(f"GetPosts - Missing user or post location information. Skipping post: {scored_Post['_id']}")
+            else:
+                print(f"GetPosts - Search radius not used. Including post: {scored_Post['_id']}")
+                NewPost = {
+                    "PID": str(scored_Post['_id']),
+                    "PostOwner": scored_Post.get("PostOwner"),
+                    "CreateTime": scored_Post.get('CreateTime'),
+                    "Title": scored_Post.get("Title"),
+                    "Text": scored_Post.get("Text"),
+                    "Price": scored_Post.get("Price"),
+                    "Auction": scored_Post.get("Auction"),
+                    "LostFound": scored_Post.get("LostFound"),
+                    "Images": scored_Post.get("Images"),
+                    "Comments": scored_Post.get('Comments'),
+                    "Latitude": latitude,
+                    "Longitude": longitude,
+                    "Score": Score
+                }
+                Posts.append(NewPost)
+
+    if len(Posts) > Num:
+        Posts = random.sample(Posts, Num)
+    Posts = sorted(Posts, key=lambda d: d['Score'], reverse=True)
+
     return_data['Posts'] = Posts
     return_data["Success"] = True
+
+    print(f"GetPosts - Number of posts returned: {len(Posts)}")
 
     return return_data
 
 
-@app.route('/click-post', methods=['GET'])
+@api.route('/click-post', methods=['GET'])
 # http://localhost:8080/click-post?EmailAddress=1030920919@qq.com&PID=65a199aaa2c14c072766377a
 def ClickPost():
     return_data = {}
@@ -1164,7 +1201,7 @@ def ClickPost():
     return return_data
     
 
-@app.route('/get-post-history', methods=['GET'])
+@api.route('/get-post-history', methods=['GET'])
 # http://localhost:8080/get-view-history?EmailAddress=1030920919@qq.com
 def GetPostHistory():
     return_data = {}
@@ -1229,5 +1266,5 @@ def GetPostHistory():
 
 if __name__ == '__main__':
     # db.Posts.drop_index("Title_Text")
-    # app.run(host='localhost', port=8080, debug=True)
-    app.run(host='0.0.0.0', port=8081, debug=True)
+    # api.run(host='localhost', port=8080, debug=True)
+    api.run(host='0.0.0.0', port=8081, debug=True)
