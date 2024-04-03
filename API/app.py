@@ -23,8 +23,7 @@ from sklearn.metrics.pairwise import cosine_similarity
 # Helper function
 def mongodb_init():
     # connect to mongodb
-    mongo = pymongo.MongoClient(host='18.162.214.19', port=27017, username="root", password="1647#4hkust",
-                                authSource='admin')
+    mongo = pymongo.MongoClient(host='18.162.214.19', port=27017, username="root", password="1647#4hkust", authSource='admin')
     print('数据库当前的databases: ', mongo.list_database_names())
     return mongo
 
@@ -212,18 +211,22 @@ class RS():
             json.dump(Fields_data, json_file, indent=4)
     
     def gpt_classify(self, Title, Text, Fields_List):
-        # 创建一个对话以传递商品信息给GPT
-        system_msg = "You are a product classification assistant."
-        user_msg = f"Please put product named “{Title}” into one of the fields {Fields_List} according to the product description: {Text}. If no suitable fields, provide me with one new field. Answer me with only field name without quotation marks."
-        
-        client = OpenAI(api_key="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",)
-        
-        chat_completion = client.chat.completions.create(model="gpt-4",
-            messages=[{"role": "system", "content": system_msg}, {"role": "user", "content": user_msg}])
-        classify_result = chat_completion.choices[0].message.content
-        print(user_msg)
-        print(f"Product “{Title}” is classified into: {classify_result}")
-        return classify_result
+        try:
+            # 创建一个对话以传递商品信息给GPT
+            system_msg = "You are a product classification assistant."
+            user_msg = f"Please put product named “{Title}” into one of the fields {Fields_List} according to the product description: {Text}. If no suitable fields, provide me with one new field. Answer me with only field name without quotation marks."
+            
+            client = OpenAI(api_key="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",)
+            
+            chat_completion = client.chat.completions.create(model="gpt-4",
+                messages=[{"role": "system", "content": system_msg}, {"role": "user", "content": user_msg}])
+            classify_result = chat_completion.choices[0].message.content
+            # print(user_msg)
+            # print(f"Product “{Title}” is classified into: {classify_result}")
+            return classify_result
+        except:
+            print("Error: Invalid api_key.")
+            return None
     
     def updata_Fields(self):\
         # 查看是否有本地保存的Fields文件
@@ -243,17 +246,21 @@ class RS():
         self.save_Fields()
         
     def add_Post(self, NewPost, _id):
-        if NewPost["Fields"]:
-            self.unique_fields.update(NewPost["Fields"])
+        Fields = NewPost.get("Fields")
+        if Fields:
+            self.unique_fields.update(Fields)
+        else:
+            NewPost["Fields"] = []
         classify_result = self.gpt_classify(NewPost["Title"], NewPost["Text"], self.unique_fields)
         
-        if classify_result not in self.unique_fields:
-            self.unique_fields.add((classify_result))
-        self.save_Fields()
+        if classify_result:
+            if classify_result not in self.unique_fields:
+                self.unique_fields.add((classify_result))
+            self.save_Fields()
             
-        if classify_result not in NewPost["Fields"]:
-            NewPost["Fields"].append(classify_result)
-        self.data_Fields[str(_id)] = NewPost["Fields"]
+            if classify_result not in NewPost["Fields"]:
+                NewPost["Fields"].append(classify_result)
+            self.data_Fields[str(_id)] = NewPost["Fields"]
         
         # 更新领域
         db.Posts.update_one({'_id': _id}, {"$set": {'Fields': NewPost["Fields"]}})
@@ -268,40 +275,13 @@ class RS():
 
 
 # API below
-app = Flask(__name__)
+api = Flask(__name__)
 mongo = mongodb_init()
 db = get_db(mongo, 'chen_db')
 rs = RS(db)
 
 
-@app.route('/drop-table')
-# http://localhost:5000/drop_table
-def DropAllTable():
-    return_data = {}
-
-    TableName = request.args.get("TableName")
-    if not TableName:
-        # 没有指明TableName，全部删除
-        db.UserInfos.drop()
-        db.Messages.drop()
-        db.Posts.drop()
-        return_data["Success"] = True
-    elif TableName == 'UserInfos':
-        db.UserInfos.drop()
-        return_data["Success"] = True
-    elif TableName == 'Messages':
-        db.Messages.drop()
-        return_data["Success"] = True
-    elif TableName == 'Posts':
-        db.Posts.drop()
-        return_data["Success"] = True
-    else:
-        return_data["Success"] = False
-        return_data['Error'] = 'Can not find the table!'
-    return return_data
-
-
-@app.route('/email-no-exist', methods=["GET"])
+@api.route('/email-no-exist', methods=["GET"])
 # http://localhost:8080/email-no-exist?EmailAddress=1030920919@qq.com
 def EmailNoExist():
     return_data = {}
@@ -334,7 +314,7 @@ def EmailNoExist():
     
     return return_data
 
-@app.route('/email-validation', methods=["GET"])
+@api.route('/email-validation', methods=["GET"])
 # http://localhost:5000/email-validation?EmailAddress=1030920919@qq.com
 # http://localhost:5000/email-validation?EmailAddress=1030920919@qq.com&InputCode=123456
 # http://16.162.42.168/chen/email-validation?EmailAddress=1030920919@qq.com
@@ -394,6 +374,7 @@ def EmailValidation():
     else:
         # 有InputCode，鉴定验证码对不对
         UserInfo = db.UserInfos.find_one({'EmailAddress': EmailAddress})
+        print(UserInfo)
         if UserInfo:
             # 此账户存在
             ValidCode = UserInfo['ValidCode']
@@ -412,7 +393,7 @@ def EmailValidation():
     return return_data
 
 
-@app.route('/set-reset-password', methods=['POST'])
+@api.route('/set-reset-password', methods=['POST'])
 # http://localhost:5000/set-reset-password
 def SetResetPassword():
     return_data = {}
@@ -475,7 +456,7 @@ def SetResetPassword():
     return return_data
 
 
-@app.route('/create-account', methods=['POST'])
+@api.route('/create-account', methods=['POST'])
 # http://localhost:5000/create-account
 def CreateAccount():
     return_data = {}
@@ -549,7 +530,7 @@ def CreateAccount():
     return return_data
 
 
-@app.route('/login', methods=['POST'])
+@api.route('/login', methods=['POST'])
 # http://localhost:5000/login
 def Login():
     return_data = {}
@@ -573,7 +554,7 @@ def Login():
     return return_data
 
 
-@app.route('/get-user-info', methods=['GET'])
+@api.route('/get-user-info', methods=['GET'])
 # http://localhost:5000/get-user-info
 def GetUserInfo():
     return_data = {}
@@ -603,7 +584,7 @@ def GetUserInfo():
     return return_data
 
 
-@app.route('/send-message', methods=['POST'])
+@api.route('/send-message', methods=['POST'])
 # http://localhost:5000/send-message
 def SendMessage():
     return_data = {}
@@ -672,7 +653,7 @@ def SendMessage():
     return return_data
 
 
-@app.route('/get-message', methods=['POST'])
+@api.route('/get-message', methods=['POST'])
 # http://localhost:5000/get-message
 def GetMessages():
     return_data = {}
@@ -750,7 +731,7 @@ def GetMessages():
     return return_data
 
 
-@app.route('/new-post', methods=['POST'])
+@api.route('/new-post', methods=['POST'])
 # http://localhost:5000/new-post
 def NewPost():
     return_data = {}
@@ -781,6 +762,15 @@ def NewPost():
     NewPost['Auction'] = request.json.get("Auction")
     NewPost['LostFound'] = request.json.get("LostFound")
     
+    # Handle location coordinates
+    Latitude = request.json.get("Latitude")
+    Longitude = request.json.get("Longitude")
+    if Latitude and Longitude:
+        NewPost['Location'] = {
+            "type": "Point",
+            "coordinates": [Longitude, Latitude]
+        }
+        
     NewPost['PostOwner'] = PostOwner
     NewPost['Deleted'] = False
     NewPost['IsSold'] = False
@@ -796,7 +786,7 @@ def NewPost():
     return return_data
 
 
-@app.route('/delete-post', methods=['POST'])
+@api.route('/delete-post', methods=['POST'])
 # http://localhost:5000/delete-post
 def DeletePost():
     return_data = {}
@@ -840,7 +830,7 @@ def DeletePost():
     return return_data
 
 
-@app.route('/sold-post', methods=['POST'])
+@api.route('/sold-post', methods=['POST'])
 # http://localhost:5000/sold-post
 def SoldPost():
     return_data = {}
@@ -875,7 +865,7 @@ def SoldPost():
     return return_data
 
 
-@app.route('/user-posts', methods=['GET'])
+@api.route('/user-posts', methods=['GET'])
 # http://localhost:5000/user-posts?EmailAddress=1030920919@qq.com
 def UserPosts():
     return_data = {}
@@ -913,7 +903,7 @@ def UserPosts():
     return return_data
 
 
-@app.route('/post-comment', methods=['POST'])
+@api.route('/post-comment', methods=['POST'])
 # http://localhost:5000/post-comment
 def PostComment():
     return_data = {}
@@ -967,7 +957,7 @@ def PostComment():
     return return_data
 
 
-@app.route('/get-posts', methods=['GET'])
+@api.route('/get-posts', methods=['GET'])
 # http://localhost:5000/get-posts
 def GetPosts():
     '''
@@ -1047,13 +1037,17 @@ def GetPosts():
         if FavoriteFields:
             unique_Fields.update(FavoriteFields)
         
+        # 随机添加一些额外的fields
+        if len(rs.unique_fields) > 4:
+            unique_Fields.update(random.sample(rs.unique_fields, 4))
+        
         if len(unique_Fields) > 0:
             # 有推荐的fields, 将用户所有的喜欢领域作为关键词检索
             Fields_Str = ""
             for Field in unique_Fields:
                 Fields_Str += ' ' + Field
             scored_Posts = db.Posts.find({"$text":{"$search": Fields_Str}, "Deleted": {"$ne": True}, "IsSold": {"$ne": True}}, {"Score":{"$meta": "textScore"}}) # 返回所有未被删除的有关posts
-            # scored_Posts = sorted(scored_Posts, key=itemgetter('Score'), reverse=True) # 降序排序
+
         else:
             # 没有推荐的Fields,随机推荐,没有score
             count = db.Posts.count_documents({'Deleted': {'$ne': True}, "IsSold": {"$ne": True}})
@@ -1093,7 +1087,7 @@ def GetPosts():
     return return_data
 
 
-@app.route('/click-post', methods=['GET'])
+@api.route('/click-post', methods=['GET'])
 # http://localhost:8080/click-post?EmailAddress=1030920919@qq.com&PID=65a199aaa2c14c072766377a
 def ClickPost():
     return_data = {}
@@ -1146,7 +1140,7 @@ def ClickPost():
     return return_data
     
 
-@app.route('/get-post-history', methods=['GET'])
+@api.route('/get-post-history', methods=['GET'])
 # http://localhost:8080/get-view-history?EmailAddress=1030920919@qq.com
 def GetPostHistory():
     return_data = {}
@@ -1207,5 +1201,5 @@ def GetPostHistory():
 
 if __name__ == '__main__':
     # db.Posts.drop_index("Title_Text")
-    app.run(host='localhost', port=8080, debug=True)
+    api.run(host='localhost', port=8080, debug=True)
     

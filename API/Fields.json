@@ -1,17 +1,19 @@
 {
     "Fields": [
-        "Musical Instruments",
-        "Furniture",
         "Sports",
-        "'Cameras & Camcorders'",
-        "Stationery",
         "Clothing",
-        "'Bikes'",
-        "Cars & Vehicles",
+        "'Cameras & Camcorders'",
         "Cameras & Camcorders",
+        "Stationery",
+        "Cars & Vehicles",
+        "Musical Instruments",
         "Sporting Goods & Exercise",
+        "Real Estate",
+        "Electronics",
+        "Book",
         "'Sports'",
-        "Bikes",
-        "Book"
+        "'Bikes'",
+        "Furniture",
+        "Bikes"
     ]
 }
