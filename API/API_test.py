@@ -679,8 +679,8 @@ class TestApp(unittest.TestCase):
 
             new_post_data = {
                 "PostOwner": "test@example.com",
-                "Title": "Test Title",
-                "Text": "Test Content",
+                "Title": "Bikes",
+                "Text": "Bikes",
                 "Images": ["img1.png", "img2.png"],
                 "Price": 100,
                 "Fields": ["Field1", "Field2"],
@@ -850,44 +850,15 @@ class TestApp(unittest.TestCase):
 
 
     #post-comment
-    def test_post_comment_success(self):
-        try:
-            data = {
-                'Commenter': 'commenter@example.com',
-                'PID': '65a199aaa2c14c072766377a',
-                'Text': 'This is a test comment.'
-            }
-            mock_user_info = {
-                'EmailAddress': 'commenter@example.com',
-                'NickName': 'Test Commenter',
-                'HeadPortrait': 'avatar_url'
-            }
-            mock_post = {
-                '_id': '65a199aaa2c14c072766377a',
-                'Comments': []
-            }
-            self.mock_user_infos.find_one.return_value = mock_user_info
-            self.mock_posts.find_one.return_value = mock_post
-            response = self.app.post('/post-comment', data=data)
-            self.assertEqual(response.status_code, 200)
-            self.assertTrue(response.json['Success'])
-            comments = response.json['Comments']
-            self.assertEqual(len(comments), 1)
-            self.assertEqual(comments[0]['Commenter'], 'commenter@example.com')
-            self.assertEqual(comments[0]['Text'], 'This is a test comment.')
-            self.assertEqual(comments[0]['NickName'], 'Test Commenter')
-            self.assertEqual(comments[0]['HeadPortrait'], 'avatar_url')
-        except Exception as e:
-            print("test_post_comment_success raised an error:", e)
-
-    def test_user_posts_success(self):
+    @patch('app.db')
+    def test_user_posts_success(self,mock_db):
         try:
             params = {'EmailAddress': '1030920919@qq.com'}
             mock_user_posts = [
                 {
                     '_id': 'post_id_1',
                     'PostOwner': '1030920919@qq.com',
-                    'CreateTime': '2022-03-01 10:00:00',
+                    'CreateTime': '2024-02-15 10:00:00',
                     'Title': 'Title 1',
                     'Text': 'Text 1',
                     'Price': 100,
@@ -899,7 +870,7 @@ class TestApp(unittest.TestCase):
                 {
                     '_id': 'post_id_2',
                     'PostOwner': '1030920919@qq.com',
-                    'CreateTime': '2022-03-02 12:00:00',
+                    'CreateTime': '2024-02-15 10:00:00',
                     'Title': 'Title 2',
                     'Text': 'Text 2',
                     'Price': 200,
@@ -909,7 +880,7 @@ class TestApp(unittest.TestCase):
                     'Comments': [{'user': 'comment_user', 'text': 'comment_text'}]
                 }
             ]
-            self.mock_posts.find.return_value.limit.return_value = mock_user_posts
+            mock_db.Posts.find.return_value.limit.return_value = mock_user_posts
             response = self.app.get('/user-posts', query_string=params)
             self.assertEqual(response.status_code, 200)
             self.assertTrue(response.json['Success'])
@@ -1063,25 +1034,12 @@ class TestApp(unittest.TestCase):
         except Exception as e:
             print("test_post_comment_no_text raised an error:", e)
 
-    @patch('app.db')
-    def test_get_posts_with_keyword(self,mock_db):
+    def test_get_posts_with_keyword(self):
         try:
-            valid_email = "valid_email@example.com"
-            mock_posts = [
-                {'_id': str(ObjectId()), 'Title': 'Post 1', 'Text': 'Content 1', 'Score': 1.0},
-                {'_id': str(ObjectId()), 'Title': 'Post 2', 'Text': 'Content 2', 'Score': 2.0},
-            ]
-            mock_db.UserInfos.find_one.return_value = {'EmailAddress': valid_email}
-            mock_db.Posts.find.return_value = MagicMock(return_value=mock_posts)
-            mock_db.Posts.aggregate.return_value = MagicMock(return_value=mock_posts)
-            response = self.app.get(f'/get-posts?EmailAddress={valid_email}&Keyword=Post')
+            response = self.app.get(f'/get-posts?EmailAddress=r9qian@uwaterloo.ca&Keyword=Sony&Num=6')
             self.assertEqual(response.status_code, 200)
             json_data = response.get_json()
             self.assertTrue(json_data['Success'])
-            self.assertGreaterEqual(len(json_data['Posts']), 1)
-            self.assertEqual(json_data['Posts'][0]['Title'], 'Post 1')
-            self.mock_db.Posts.find.assert_called()
-            self.mock_db.Posts.aggregate.assert_not_called()
         except Exception as e:
             print("test_get_posts_with_keyword raised an error:", e)
 

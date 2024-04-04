@@ -216,7 +216,7 @@ class RS():
         system_msg = "You are a product classification assistant."
         user_msg = f"Please put product named “{Title}” into one of the fields {Fields_List} according to the product description: {Text}. If no suitable fields, provide me with one new field. Answer me with only field name without quotation marks."
         
-        client = OpenAI(api_key="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",)
+        client = OpenAI(api_key="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",)
         
         chat_completion = client.chat.completions.create(model="gpt-4",
             messages=[{"role": "system", "content": system_msg}, {"role": "user", "content": user_msg}])
