@@ -983,7 +983,7 @@ def GetPosts():
     Num = request.args.get("Num")
     if Num: # not null
         Num = int(Num)
-        if Num <= 0 and Num > 10:
+        if Num <= 0 or Num > 10:
             return_data["Success"] = False
             return_data["Error"] = "Parameter Num is not in valid range."
             return return_data
