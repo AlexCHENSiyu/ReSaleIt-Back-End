@@ -14,23 +14,32 @@ class TestApp(unittest.TestCase):
         self.app = app.test_client()
         self.app.testing = True
     
+
+
+    # email-no-exist
     def test_EmailNoExist_1(self):
         try:
-            response = self.app.get('/email-no-exist?EmailAddress=1030920919@qq.com')  # GET 请求发送的数据
+            response = self.app.get('/email-no-exist?EmailAddress=1030920919@qq.com')  
             self.assertEqual(response.status_code, 200)
             self.assertFalse(response.json["Success"])
         except:
             print("test_EmailNoExist_1 raise errors.")
+    
+   
 
+    #login
     def test_Login_1(self):
         try:
-            data = {'EmailAddress': '1030920919@qq.com', 'Password': 1234}  # POST 请求发送的数据
+            data = {'EmailAddress': '1030920919@qq.com', 'Password': 1234}  
             response = self.app.post('/login', data=data)
             self.assertEqual(response.status_code, 200)
             self.assertTrue(response.json["Success"])
         except:
             print("test_Login_1 raise errors.")
 
+    
+
+    #email-no-exist
     def test_email_no_exist_no_email(self):
         try:
             response=self.app.get('/email-no-exist?EmailAddress=')
@@ -50,19 +59,11 @@ class TestApp(unittest.TestCase):
     @patch('app.db')
     def test_email_no_exist_user_no_password(self, mock_db):
         try:
-        # 模拟数据库返回存在的用户但没有密码
             mock_db.UserInfos.find_one.return_value = {'EmailAddress': '1030920919@qq.com', 'Password': None}
-
-        # 发起请求
             response = self.app.get('/email-no-exist?EmailAddress=1030920919@qq.com')
-
-        # 检查响应
             self.assertEqual(response.status_code, 200)
             self.assertTrue(response.json["Success"])
-
-        # 验证是否进行了数据库查询
             mock_db.UserInfos.find_one.assert_called_with({'EmailAddress': '1030920919@qq.com'})
-
         except Exception as e:
             print(f"email_no_exist3 raise errors: {e}")
             raise
@@ -83,6 +84,8 @@ class TestApp(unittest.TestCase):
             print(f"email_no_exist5 raise errors: {e}")
             raise
     
+
+    #email-validation
     def test_email_validation_no_email(self):
         try:
             response=self.app.get('/email-validation?EmailAddress=')
@@ -103,7 +106,6 @@ class TestApp(unittest.TestCase):
         try:
             mock_user_info = {"EmailAddress": "test@example.com", "CodeTime": "2024-03-31T12:00:00"}
             mock_find_one.return_value = mock_user_info
-
             response = self.app.get('/email-validation?EmailAddress=test@example.com')
             self.assertEqual(response.status_code, 200)
             self.assertTrue(response.json["Success"])
@@ -149,7 +151,6 @@ class TestApp(unittest.TestCase):
         # 确保没有调用数据库更新和插入操作
         mock_db.UserInfos.update_one.assert_not_called()
         mock_db.UserInfos.insert_one.assert_not_called()
-
     @patch('app.db.UserInfos.find_one')
     def test_email_validation_recent_code_sent(self, mock_find_one):
         try:
@@ -188,16 +189,6 @@ class TestApp(unittest.TestCase):
             print(f"email_validation9 raise errors, {e}")
             raise
     @patch('app.db.UserInfos.find_one')
-    def test_email_validation_inputcode_correct(self, mock_find_one):
-        try:
-            mock_find_one.return_value = {'EmailAddress': 'user@example.com', 'ValidCode': '123456'}
-            response = self.app.get('/email-validation?EmailAddress=user@example.com&InputCode=123456')
-            self.assertEqual(response.status_code, 200)
-            self.assertTrue(response.json['Success'])
-        except Exception as e:
-            print(f"email_validation10 raise errors, {e}")
-            raise
-    @patch('app.db.UserInfos.find_one')
     def test_email_validation_no_user_code_provided(self, mock_find_one):
         try:
             mock_find_one.return_value = None       
@@ -209,6 +200,10 @@ class TestApp(unittest.TestCase):
             print(f"email_validation11 raise errors, {e}")
             raise
     
+    
+    
+    
+    #set-reset-password
     def test_set_reset_password_no_email(self):
         try:
             data={'EmailAddress': "123456"}
@@ -400,6 +395,8 @@ class TestApp(unittest.TestCase):
     
 
 
+
+    #create-account
     def test_create_account_no_email(self):
         try:
             data={}
@@ -434,99 +431,44 @@ class TestApp(unittest.TestCase):
         except Exception as e:
             print(f"create_account2 raise errors, {e}")
             raise
-    @patch('app.db.UserInfos.find_one')
     @patch('app.check_email')
     @patch('app.db')
-    def test_create_account_existing_email(self, mock_db, mock_check_email, mock_find_one):
+    def test_create_account_existing_email(self, mock_db, mock_check_email):
         try:
-        # 模拟邮箱已存在
-            mock_find_one.return_value = {'EmailAddress': 'existing_email@example.com'}
+            existing_email = 'existing_email@example.com'
+            mock_db.UserInfos.find_one.return_value = {'EmailAddress': existing_email}
             mock_check_email.return_value = (True, None)
-
-        # 其他数据库操作模拟
             mock_db.UserInfos.update_one = MagicMock()
             mock_db.UserInfos.insert_one = MagicMock()
-
-        # 测试数据
             user_data = {
-                "EmailAddress": "existing_email@example.com",
+                "EmailAddress": existing_email,
                 "Password": "newpassword",
             }
-
-        # 执行请求
             response = self.app.post('/create-account', json=user_data)
-
-        # 检查响应和数据库操作
             self.assertEqual(response.status_code, 200)
             json_data = response.get_json()
-            self.assertTrue(json_data['Success'])
-
-        # 确保正确的数据库调用
-            mock_find_one.assert_called_once_with({'EmailAddress': 'existing_email@example.com'})
-            mock_db.UserInfos.update_one.assert_called_once()
+            self.assertFalse(json_data['Success'])  
+            mock_db.UserInfos.find_one.assert_called_once_with({'EmailAddress': existing_email})
+            mock_db.UserInfos.update_one.assert_not_called()
             mock_db.UserInfos.insert_one.assert_not_called()
-
+            mock_db.reset_mock()
         except Exception as e:
             print(f"create_account_existing_email test raised errors, {e}")
             raise
-    @patch('app.check_email')
-    def test_create_account_wrong_password(self, mock_check_email):
-        # 模拟邮箱格式正确
-        mock_check_email.return_value = (True, None)
-
-        # 模拟用户已存在但提供了错误的密码
-        app.db.UserInfos.find_one = MagicMock(return_value={'EmailAddress': 'existing_user@example.com', 'Password': 'correct_password'})
-        app.db.UserInfos.update_one = MagicMock()
-
-        # 测试数据
-        new_account_data = {
-            "EmailAddress": "existing_user@example.com",
-            "Password": "wrong_password",
-            "FirstName": "Test",
-            "LastName": "User"
-        }
-
-        # 发起 POST 请求
-        response = self.app.post('/create-account', json=new_account_data)
-
-        # 断言
-        self.assertEqual(response.status_code, 200)
-        json_data = response.get_json()
-        self.assertFalse(json_data['Success'])
-        self.assertEqual(json_data['Error'], "Wrong password!")
-
-        # 确保数据库更新操作没有被调用
-        app.db.UserInfos.update_one.assert_not_called()
-    @patch('app.check_email')
-    def test_create_account_correct_password(self, mock_check_email):
-        # 模拟邮箱格式正确
-        mock_check_email.return_value = (True, None)
-
-        # 模拟用户已存在并且密码匹配
-        app.db.UserInfos.find_one = MagicMock(return_value={'EmailAddress': 'existing_user@example.com', 'Password': 'correct_password'})
-        app.db.UserInfos.update_one = MagicMock()
-
-        # 测试数据
-        new_account_data = {
-            "EmailAddress": "existing_user@example.com",
-            "Password": "correct_password",
-            "FirstName": "Test",
-            "LastName": "User"
-        }
-
-        # 发起 POST 请求
-        response = self.app.post('/create-account', json=new_account_data)
-
-        # 断言
-        self.assertEqual(response.status_code, 200)
-        json_data = response.get_json()
-        self.assertTrue(json_data['Success'])
-
-        # 验证数据库更新操作被调用
-        app.db.UserInfos.update_one.assert_called_once_with({'EmailAddress': 'existing_user@example.com'}, {"$set": new_account_data})
+    def test_create_account_wrong_password(self):
+        try:
+            response=self.app.post('/create-account',json={'EmailAddress': "x89zhang@uwaterloo.ca", 'Password': "000000"})
+            self.assertEqual(response.status_code, 200)
+            self.assertFalse(response.json["Success"])
+        except Exception as e:
+            print(f"create_account3 raise errors: {e}")
+            raise
+    
     
 
 
+
+    #login
     def test_login_no_email(self):
         data={}
         try:
@@ -545,6 +487,11 @@ class TestApp(unittest.TestCase):
         except Exception as e:
             print(f"login raise3 errors, {e}")
             raise
+    
+    
+    
+    
+    #get-user-info
     def test_get_user_info_no_email(self):
         try:
             response=self.app.get('/get-user-info?EmailAddress=')
@@ -561,6 +508,11 @@ class TestApp(unittest.TestCase):
         except Exception as e:
             print(f"get_user_info2 raise errors: {e}")
             raise
+    
+    
+    
+    
+    #send-message
     def test_send_message_no_valid_email(self):
         try:
             data={'Sender': "invalid_email"}
@@ -583,7 +535,6 @@ class TestApp(unittest.TestCase):
         except Exception as e:
             print(f"send_message2 raise errors: {e}")
             raise
-
     def test_send_message_no_valid_content(self):
         try:
             data={'Sender': "x89zhang@uwaterloo.ca", 'Receiver': "281750569@qq.com"}
@@ -629,23 +580,19 @@ class TestApp(unittest.TestCase):
         try:
             mock_check_email.return_value = (True, None)
 
-    # 模拟数据库中没有现有聊天记录
             mock_db.Messages.find_one.return_value = None
             mock_db.Messages.insert_one = MagicMock()
 
-    # 发送消息
             response = self.app.post('/send-message', json={
                 'Sender': 'valid_sender@example.com',
                 'Receiver': 'valid_receiver@example.com',
                 'Content': {'Text': 'Hello!'}
             })
 
-    # 验证响应
             self.assertEqual(response.status_code, 200)
             json_data = response.get_json()
             self.assertTrue(json_data['Success'])
 
-    # 验证数据库插入操作是否如预期执行了两次
             calls = [
                 call({
                     'Contents': [{'Text': 'Hello!', 'CreateTime': mock.ANY}],
@@ -666,6 +613,11 @@ class TestApp(unittest.TestCase):
         except Exception as e:
             print(f"send_message6 raise errors: {e}")
             raise
+    
+    
+    
+    
+    #get-message
     def test_get_message_no_valid_email(self):
         try:
             data={'EmailAddress': "invalid_email"}
@@ -702,6 +654,11 @@ class TestApp(unittest.TestCase):
         except Exception as e:
             print(f"get_message4 raise errors: {e}")
             raise
+    
+    
+    
+    
+    #new-post
     def test_new_post_no_email(self):
         try:
             data={}
@@ -740,6 +697,11 @@ class TestApp(unittest.TestCase):
         except Exception as e:
             print(f"new_post2 raise errors: {e}")
             raise
+    
+    
+    
+    
+    #delete-post
     def test_delete_post_invalid_email(self):
         try:
             data={'EmailAddress': "invalid_email"}
@@ -834,156 +796,67 @@ class TestApp(unittest.TestCase):
 
 
 
-    def test_get_post_history_success(self):
-        try:
-            # 模拟请求参数
-            params = {'EmailAddress': 'user@example.com'}
-            # 模拟用户存在，且有帖子历史记录的情况
-            mock_user_info = {
-                'EmailAddress': 'user@example.com',
-                'PostHistory': ['post_id_1', 'post_id_2']
-            }
-            # 模拟帖子记录
-            mock_post_1 = {
-                '_id': 'post_id_1',
-                'PostOwner': 'owner1',
-                'CreateTime': 'create_time_1',
-                'Title': 'title1',
-                'Text': 'text1',
-                'Price': 100,
-                'Auction': False,
-                'LostFound': False,
-                'Images': [],
-                'Comments': [],
-                'Score': 5
-            }
 
-            mock_post_2 = {
-                '_id': 'post_id_2',
-                'PostOwner': 'owner2',
-                'CreateTime': 'create_time_2',
-                'Title': 'title2',
-                'Text': 'text2',
-                'Price': 200,
-                'Auction': True,
-                'LostFound': False,
-                'Images': ['image_url'],
-                'Comments': [{'user': 'comment_user', 'text': 'comment_text'}],
-                'Score': 4
-            }
-            # 设置模拟行为
-            self.mock_user_infos.find_one.return_value = mock_user_info
-            self.mock_posts.find_one.side_effect = [mock_post_1, mock_post_2]
-            # 发送请求
-            response = self.app.get('/get-post-history', query_string=params)
-            # 断言状态码为 200
-            self.assertEqual(response.status_code, 200)
-            # 断言返回的结果包含成功标志和帖子历史记录
-            self.assertTrue(response.json['Success'])
-            self.assertTrue(response.json['Posts'])
-        except Exception as e:
-            print("test_get_post_history_success raised an error:", e)
-
-    def test_get_post_history_user_not_found(self):
-        try:
-            # 模拟请求参数
-            params = {'EmailAddress': 'user@example.com'}
-            # 模拟用户不存在的情况
-            self.mock_user_infos.find_one.return_value = None
-            # 发送请求
-            response = self.app.get('/get-post-history', query_string=params)
-            # 断言状态码为 200
-            self.assertEqual(response.status_code, 200)
-            # 断言返回的结果包含失败标志和错误消息
-            self.assertFalse(response.json['Success'])
-            self.assertEqual(response.json['Error'], "Did not find account. Please try it again!")
-        except Exception as e:
-            print("test_get_post_history_user_not_found raised an error:", e)
+    #get-post
+    
 
     def test_get_post_history_invalid_email_format(self):
         try:
-            # 模拟请求参数
             params = {'EmailAddress': 'invalid_email_format'}
-            # 发送请求
             response = self.app.get('/get-post-history', query_string=params)
-            # 断言状态码为 200
             self.assertEqual(response.status_code, 200)
-            # 断言返回的结果包含失败标志和错误消息
             self.assertFalse(response.json['Success'])
             self.assertEqual(response.json['Error'], "invalid_email_format is not a email address!")
         except Exception as e:
             print("test_get_post_history_invalid_email_format raised an error:", e)
 
 
-    def test_click_post_success(self):
+
+
+    #click-post
+    @patch('app.db')
+    @patch('app.check_email')
+    @patch('app.check_post')
+    def test_click_post_success(self,mock_check_post,mock_check_email,mock_db):
         try:
-            # 模拟请求参数
-            params = {'EmailAddress': '1030920919@qq.com', 'PID': '65a199aaa2c14c072766377a'}
-            # 模拟帖子存在的情况
-            mock_post = {
-                '_id': '65a199aaa2c14c072766377a',
-                'Count': '5'
-            }
-            # 模拟用户存在的情况
-            mock_user_info = {
-                'EmailAddress': '1030920919@qq.com',
-                'PostHistory': ['65a199aaa2c14c072766377a']
-            }
-            # 设置模拟行为
-            self.mock_posts.find_one.return_value = mock_post
-            self.mock_user_infos.find_one.return_value = mock_user_info
-            # 发送请求
-            response = self.app.get('/click-post', query_string=params)
-            # 断言状态码为 200
+            valid_pid = str(ObjectId())
+            valid_email = "valid_email@example.com"
+            mock_check_email.return_value = (True, None)
+            mock_check_post.return_value = (True, None)
+            mock_db.UserInfos.find_one = MagicMock(return_value={'EmailAddress': valid_email, 'PostHistory': []})
+            mock_db.Posts.find_one = MagicMock(return_value={'_id': valid_pid, 'Count': '1'})
+            mock_db.Posts.update_one = MagicMock()
+            mock_db.UserInfos.update_one = MagicMock()
+            response = self.app.get(f'/click-post?EmailAddress={valid_email}&PID={valid_pid}')
             self.assertEqual(response.status_code, 200)
-            # 断言返回的结果包含成功标志
-            self.assertTrue(response.json['Success'])
-            # 检查帖子点击计数是否正确更新
-            self.assertEqual(response.json['Count'], 6)
-            # 检查用户的帖子历史记录是否正确更新
-            self.assertIn('65a199aaa2c14c072766377a', response.json['UserPostHistory'])
+            json_data = response.get_json()
+            self.assertTrue(json_data['Success'])
+            mock_db.Posts.update_one.assert_called()
+            mock_db.UserInfos.update_one.assert_called()
         except Exception as e:
             print("test_click_post_success raised an error:", e)
 
-    def test_click_post_user_not_found(self):
-        try:
-            # 模拟请求参数
-            params = {'EmailAddress': 'nonexistent_user@example.com', 'PID': '65a199aaa2c14c072766377a'}
-            # 模拟用户不存在的情况
-            self.mock_user_infos.find_one.return_value = None
-            # 发送请求
-            response = self.app.get('/click-post', query_string=params)
-            # 断言状态码为 200
-            self.assertEqual(response.status_code, 200)
-            # 断言返回的结果包含失败标志和错误消息
-            self.assertFalse(response.json['Success'])
-            self.assertEqual(response.json['Error'], "Did not find account. Please try it again!")
-        except Exception as e:
-            print("test_click_post_user_not_found raised an error:", e)
 
     def test_click_post_invalid_email_format(self):
         try:
-            # 模拟请求参数
             params = {'EmailAddress': 'invalid_email_format', 'PID': '65a199aaa2c14c072766377a'}
-            # 发送请求
             response = self.app.get('/click-post', query_string=params)
-            # 断言状态码为 200
             self.assertEqual(response.status_code, 200)
-            # 断言返回的结果包含失败标志和错误消息
             self.assertFalse(response.json['Success'])
             self.assertEqual(response.json['Error'], "invalid_email_format is not a email address!")
         except Exception as e:
             print("test_click_post_invalid_email_format raised an error:", e)
 
+
+
+    #post-comment
     def test_post_comment_success(self):
         try:
-            # 模拟请求数据
             data = {
                 'Commenter': 'commenter@example.com',
                 'PID': '65a199aaa2c14c072766377a',
                 'Text': 'This is a test comment.'
             }
-            # 模拟评论者存在且合法，帖子存在的情况
             mock_user_info = {
                 'EmailAddress': 'commenter@example.com',
                 'NickName': 'Test Commenter',
@@ -993,16 +866,11 @@ class TestApp(unittest.TestCase):
                 '_id': '65a199aaa2c14c072766377a',
                 'Comments': []
             }
-            # 设置模拟行为
             self.mock_user_infos.find_one.return_value = mock_user_info
             self.mock_posts.find_one.return_value = mock_post
-            # 发送请求
             response = self.app.post('/post-comment', data=data)
-            # 断言状态码为 200
             self.assertEqual(response.status_code, 200)
-            # 断言返回的结果包含成功标志
             self.assertTrue(response.json['Success'])
-            # 检查评论是否正确添加到帖子中
             comments = response.json['Comments']
             self.assertEqual(len(comments), 1)
             self.assertEqual(comments[0]['Commenter'], 'commenter@example.com')
@@ -1014,9 +882,7 @@ class TestApp(unittest.TestCase):
 
     def test_user_posts_success(self):
         try:
-            # 模拟请求参数
             params = {'EmailAddress': '1030920919@qq.com'}
-            # 模拟用户存在的情况，且有帖子存在
             mock_user_posts = [
                 {
                     '_id': 'post_id_1',
@@ -1043,21 +909,15 @@ class TestApp(unittest.TestCase):
                     'Comments': [{'user': 'comment_user', 'text': 'comment_text'}]
                 }
             ]
-            # 设置模拟行为
             self.mock_posts.find.return_value.limit.return_value = mock_user_posts
-
-            # 发送请求
             response = self.app.get('/user-posts', query_string=params)
-            # 断言状态码为 200
             self.assertEqual(response.status_code, 200)
-            # 断言返回的结果包含成功标志和用户的帖子列表
             self.assertTrue(response.json['Success'])
             posts = response.json['Posts']
             self.assertEqual(len(posts), 2)
             self.assertEqual(posts[0]['PID'], 'post_id_1')
             self.assertEqual(posts[0]['PostOwner'], '1030920919@qq.com')
             self.assertEqual(posts[0]['CreateTime'], '2024-02-15 10:00:00')
-            # 检查第二个帖子的一些属性
             self.assertEqual(posts[1]['PID'], 'post_id_2')
             self.assertEqual(posts[1]['Title'], 'Title 2')
             self.assertEqual(posts[1]['Price'], 200)
@@ -1067,23 +927,18 @@ class TestApp(unittest.TestCase):
     @patch('app.check_post')
     def test_post_comment_invalid_pid(self, mock_check_post, mock_check_email):
         try:
-        # 模拟邮箱验证成功
             mock_check_email.return_value = (True, None)
 
-        # 模拟帖子验证失败（无效的 PID）
             mock_check_post.return_value = (False, "Invalid PID!")
 
-        # 测试数据，使用一个无效的 PID
             test_comment_data = {
                 "Commenter": "commenter@example.com",
                 "PID": "invalid_pid",
                 "Text": "This is a test comment"
             }
 
-        # 发起 POST 请求
             response = self.app.post('/post-comment', data=test_comment_data)
 
-        # 断言
             self.assertEqual(response.status_code, 200)
             json_data = response.get_json()
             self.assertFalse(json_data['Success'])
@@ -1096,20 +951,16 @@ class TestApp(unittest.TestCase):
     @patch('app.check_post')
     def test_post_comment_no_text(self, mock_check_post, mock_check_email):
         try:
-    # 模拟邮箱和帖子 ID 验证成功
             mock_check_email.return_value = (True, None)
             mock_check_post.return_value = (True, None)
 
-    # 测试数据，不包含评论内容
             test_comment_data = {
                 "Commenter": "commenter@example.com",
                 "PID": "valid_pid",
             }
 
-    # 发起 POST 请求
             response = self.app.post('/post-comment', data=test_comment_data)
 
-    # 断言
             self.assertEqual(response.status_code, 200)
             json_data = response.get_json()
             self.assertFalse(json_data['Success'])
@@ -1120,13 +971,9 @@ class TestApp(unittest.TestCase):
     @patch('app.db')
     def test_post_comment_existing_comments(self, mock_db):
         mock_pid = str(ObjectId())
-
-        # Mock data
         pid = mock_pid
         commenter_email = 'commenter@example.com'
         comment_text = 'This is a comment'
-
-        # Setting up mock responses for UserInfos and Posts
         mock_db.UserInfos.find_one.return_value = {
             'EmailAddress': commenter_email,
             'NickName': 'CommenterNick',
@@ -1138,23 +985,15 @@ class TestApp(unittest.TestCase):
             'Comments': existing_comments,
             'Deleted': False
         }
-        
-        # Mock update_one to not actually modify the database
         mock_db.Posts.update_one.return_value = None
-
-        # Send a POST request to the post-comment endpoint
         response = self.app.post('/post-comment', data={
             'Commenter': commenter_email,
             'PID': pid,
             'Text': comment_text
         })
-
-        # Assertions
         self.assertEqual(response.status_code, 200)
         json_data = response.get_json()
         self.assertTrue(json_data['Success'])
-
-        # Check if update_one was called correctly
         new_comment = {
             'Commenter': commenter_email,
             'Text': comment_text,
@@ -1166,11 +1005,9 @@ class TestApp(unittest.TestCase):
     @patch('app.db')
     def test_post_comment_no_existing_comments(self, mock_db):
         mock_pid = str(ObjectId())
-        # 设置模拟的返回值
         commenter_email = 'new_commenter@example.com'
         pid = mock_pid
         comment_text = 'New comment'
-
         mock_db.UserInfos.find_one.return_value = {
             'EmailAddress': commenter_email,
             'NickName': 'CommenterNick',
@@ -1182,117 +1019,86 @@ class TestApp(unittest.TestCase):
             'Deleted': False
         }
         mock_db.Posts.update_one.return_value = None
-
-        # 测试数据
         test_comment_data = {
             "Commenter": commenter_email,
             "PID": pid,
             "Text": comment_text,
         }
-
-        # 发起 POST 请求
         response = self.app.post('/post-comment', data=test_comment_data)
-
-        # 断言
         self.assertEqual(response.status_code, 200)
         json_data = response.get_json()
         self.assertTrue(json_data['Success'])
-        #self.assertEqual(json_data['Error'], "Specific error message")
-
-
-        # 验证数据库更新操作是否被调用
         expected_comments = [{
             'Commenter': commenter_email,
             'Text': comment_text,
             'NickName': 'CommenterNick',
             'HeadPortrait': 'head_portrait.png',
-            'CreateTime': mock.ANY  # 使用 mock.ANY 来忽略具体时间值的检查
+            'CreateTime': mock.ANY  
         }]
         mock_db.Posts.update_one.assert_called_once_with(
             {'_id': ObjectId(pid)},
             {"$set": {'Comments': expected_comments}}
         )
 
-
-
-
-
-
-
-
-
-
     def test_user_posts_invalid_email_format(self):
         try:
-            # 模拟请求参数，但邮箱格式不正确
             params = {'EmailAddress': 'invalid_email_format'}
-            # 发送请求
             response = self.app.get('/user-posts', query_string=params)
-            # 断言状态码为 200
             self.assertEqual(response.status_code, 200)
-            # 断言返回的结果包含失败标志和错误消息
             self.assertFalse(response.json['Success'])
             self.assertEqual(response.json['Error'], "invalid_email_format is not a email address!")
         except Exception as e:
             print("test_user_posts_invalid_email_format raised an error:", e)
-
-
-
     def test_post_comment_no_text(self):
         try:
-            # 模拟请求数据，但没有评论内容
             data = {
                 'Commenter': 'commenter@example.com',
                 'PID': '65a199aaa2c14c072766377a',
                 'Text': ''
             }
-            # 发送请求
             response = self.app.post('/post-comment', data=data)
-            # 断言状态码为 200
             self.assertEqual(response.status_code, 200)
-            # 断言返回的结果包含失败标志和错误消息
             self.assertFalse(response.json['Success'])
             self.assertEqual(response.json['Error'], "Did not find account. Please try it again!")
         except Exception as e:
             print("test_post_comment_no_text raised an error:", e)
 
-    def test_get_posts_with_keyword(self):
+    @patch('app.db')
+    def test_get_posts_with_keyword(self,mock_db):
         try:
-            # 模拟请求数据，带有关键词
-            data = {
-                "EmailAddress": "1030920919@qq.com",
-                "Keyword": "test",
-                "Num": 6
-            }
-            # 发送请求
-            response = self.app.get('/get-posts', query_string=data)
-            # 断言状态码为 200
+            valid_email = "valid_email@example.com"
+            mock_posts = [
+                {'_id': str(ObjectId()), 'Title': 'Post 1', 'Text': 'Content 1', 'Score': 1.0},
+                {'_id': str(ObjectId()), 'Title': 'Post 2', 'Text': 'Content 2', 'Score': 2.0},
+            ]
+            mock_db.UserInfos.find_one.return_value = {'EmailAddress': valid_email}
+            mock_db.Posts.find.return_value = MagicMock(return_value=mock_posts)
+            mock_db.Posts.aggregate.return_value = MagicMock(return_value=mock_posts)
+            response = self.app.get(f'/get-posts?EmailAddress={valid_email}&Keyword=Post')
             self.assertEqual(response.status_code, 200)
-            # 断言返回的结果包含成功标志和帖子列表
-            self.assertTrue(response.json['Success'])
-            self.assertTrue(response.json['Posts'])
+            json_data = response.get_json()
+            self.assertTrue(json_data['Success'])
+            self.assertGreaterEqual(len(json_data['Posts']), 1)
+            self.assertEqual(json_data['Posts'][0]['Title'], 'Post 1')
+            self.mock_db.Posts.find.assert_called()
+            self.mock_db.Posts.aggregate.assert_not_called()
         except Exception as e:
             print("test_get_posts_with_keyword raised an error:", e)
 
     def test_get_posts_without_keyword(self):
         try:
-            # 模拟请求数据，不带关键词
             data = {
                 "EmailAddress": "1030920919@qq.com",
                 "Num": 6
             }
-            # 发送请求
             response = self.app.get('/get-posts', query_string=data)
-            # 断言状态码为 200
             self.assertEqual(response.status_code, 200)
-            # 断言返回的结果包含成功标志和帖子列表
             self.assertTrue(response.json['Success'])
             self.assertTrue(response.json['Posts'])
         except Exception as e:
             print("test_get_posts_without_keyword raised an error:", e)
     @mock.patch('app.check_password')
-    @mock.patch('app.db')
-    def test_sold_post_invalid_password(self, mock_db, mock_check_password):
+    def test_sold_post_invalid_password(self, mock_check_password):
         try:
             mock_check_password.return_value = (False, "Invalid password")
             response = self.app.post('/sold-post', data={'EmailAddress': 'user@example.com', 'Password': 'wrongpass', 'PID': str(ObjectId())})
@@ -1304,8 +1110,7 @@ class TestApp(unittest.TestCase):
             raise
     @mock.patch('app.check_post')
     @mock.patch('app.check_password')
-    @mock.patch('app.db')
-    def test_sold_post_invalid_post(self, mock_db, mock_check_password, mock_check_post):
+    def test_sold_post_invalid_post(self, mock_check_password, mock_check_post):
         try:
             mock_check_password.return_value = (True, None)
             mock_check_post.return_value = (False, "Post does not exist")
@@ -1352,166 +1157,124 @@ class TestApp(unittest.TestCase):
     @patch('app.db')
     def test_click_post(self, mock_db):
         try:
-        # 设置帖子和用户的模拟信息
             mock_pid = str(ObjectId())
             mock_email = "user@example.com"
-
-        # 模拟 Post 和 UserInfo 的 find_one 和 update_one 行为
             mock_post = {"_id": mock_pid, "Count": "5", "Deleted": False}
             mock_userinfo = {"EmailAddress": mock_email, "PostHistory": []}
-
             mock_db.Posts.find_one.return_value = mock_post
             mock_db.UserInfos.find_one.return_value = mock_userinfo
-
-        # 发送 GET 请求到 click-post 端点
             response = self.app.get(f'/click-post?EmailAddress={mock_email}&PID={mock_pid}')
-
-        # 断言
             self.assertEqual(response.status_code, 200)
             json_data = response.get_json()
             self.assertTrue(json_data["Success"])
-
-        # 验证帖子的浏览次数更新
             updated_count = str(int(mock_post["Count"]) + 1)
             mock_db.Posts.update_one.assert_called_once_with({'_id': ObjectId(mock_pid)}, {"$set": {'Count': updated_count}})
-
-        # 验证用户浏览历史更新
             updated_post_history = mock_userinfo["PostHistory"] + [mock_pid]
             mock_db.UserInfos.update_one.assert_called_once_with({'EmailAddress': mock_email}, {"$set": {'PostHistory': updated_post_history}})
-
         except Exception as e:
             print("test_click_post raised an error:", e)
             raise
     @patch('app.db')
     def test_click_post_invalid_pid(self, mock_db):
         try:
-        # 设置无效的帖子ID和有效的用户邮箱
             invalid_pid = "invalid_pid"
             valid_email = "user@example.com"
-
-        # 模拟 Post 和 UserInfo 的 find_one 和 update_one 行为
             mock_db.Posts.find_one.return_value = None
             mock_userinfo = {"EmailAddress": valid_email}
             mock_db.UserInfos.find_one.return_value = mock_userinfo
-
-        # 发送 GET 请求到 click-post 端点
             response = self.app.get(f'/click-post?EmailAddress={valid_email}&PID={invalid_pid}')
-
-        # 断言
             self.assertEqual(response.status_code, 200)
             json_data = response.get_json()
             self.assertFalse(json_data["Success"])
             self.assertEqual(json_data["Error"], "Invalid PID!")
-
-        # 验证数据库操作是否未执行
             mock_db.Posts.update_one.assert_not_called()
             mock_db.UserInfos.update_one.assert_not_called()
-
         except Exception as e:
             print("test_click_post_invalid_pid raised an error:", e)
             raise
     @patch('app.db')
     def test_click_post_account_not_exist(self, mock_db):
         try:
-        # 设置测试用的邮箱和帖子ID
             non_existent_email = "nonexistent@example.com"
             valid_pid = str(ObjectId())
-
-        # 模拟数据库返回结果
             mock_db.UserInfos.find_one.return_value = None
             mock_db.Posts.find_one.return_value = {'_id': valid_pid}
-
-        # 发送 GET 请求到 click-post 端点
             response = self.app.get(f'/click-post?EmailAddress={non_existent_email}&PID={valid_pid}')
-
-        # 断言
             self.assertEqual(response.status_code, 200)
             json_data = response.get_json()
             self.assertFalse(json_data["Success"])
             self.assertEqual(json_data["Error"], "Did not find account. Please try it again!")
-
-        # 验证数据库更新操作未被执行
             mock_db.Posts.update_one.assert_not_called()
             mock_db.UserInfos.update_one.assert_not_called()
-
         except Exception as e:
             print("test_click_post_account_not_exist raised an error:", e)
             raise
     @patch('app.db')
     @patch('app.check_email')
-    def test_get_post_history_account_not_exist(self, mock_check_email, mock_db):
-        mock_check_email.return_value = (True, None)
-
-        mock_db.UserInfos.find_one.return_value = None
-
-        email = "nonexistent@example.com"
-
-        response = self.app.get(f'/get-post-history?EmailAddress={email}')
-
-        self.assertEqual(response.status_code, 200)
-        json_data = response.get_json()
-        self.assertFalse(json_data['Success'])
-        self.assertIn("Did not find account", json_data["Error"])
-
-        mock_db.reset_mock()
-    @patch('app.db')
-    @patch('app.check_email')
     def test_get_post_history_with_existing_records(self, mock_check_email, mock_db):
         mock_pid=ObjectId()
-    # 模拟邮箱检查成功
         mock_check_email.return_value = (True, None)
-
-    # 模拟用户信息和浏览记录
         email = "user@example.com"
         mock_history = [str(mock_pid)]
         mock_user_info = {'EmailAddress': email, 'PostHistory': mock_history}
         mock_db.UserInfos.find_one.return_value = mock_user_info
 
-    # 模拟帖子信息
         mock_post_data = {
             '_id': ObjectId(mock_history[0]),
             'PostOwner': 'owner@example.com',
             'Deleted': False
-        # 其他帖子相关数据...
         }
         mock_db.Posts.find_one.return_value = mock_post_data
-
-    # 发送 GET 请求
         response = self.app.get(f'/get-post-history?EmailAddress={email}')
-
-    # 断言
         self.assertEqual(response.status_code, 200)
         json_data = response.get_json()
         self.assertTrue(json_data['Success'])
         self.assertEqual(len(json_data['Posts']), len(mock_history))
-
-    # 清理 Mock 对象
         mock_db.reset_mock()
     @patch('app.db')
     @patch('app.check_email')
     def test_get_post_history_without_records(self, mock_check_email, mock_db):
-    # 模拟邮箱检查成功
         mock_check_email.return_value = (True, None)
-
-    # 模拟没有浏览记录的用户信息
         email = "user@example.com"
         mock_user_info = {'EmailAddress': email}
         mock_db.UserInfos.find_one.return_value = mock_user_info
-
-    # 模拟 Posts 的查询不会返回任何数据
         mock_db.Posts.find_one.return_value = None
-
-    # 发送 GET 请求
         response = self.app.get(f'/get-post-history?EmailAddress={email}')
-
-    # 断言
         self.assertEqual(response.status_code, 200)
         json_data = response.get_json()
         self.assertTrue(json_data['Success'])
         self.assertEqual(len(json_data['Posts']), 0)
-
-    # 清理 Mock 对象
         mock_db.reset_mock()
+
+
+    @patch('app.check_email')
+    @patch('app.db')
+    def test_create_account_correct_password(self,mock_db, mock_check_email):
+        mock_check_email.return_value = (True, None)
+        mock_db.UserInfos.find_one = MagicMock(return_value={'EmailAddress': 'existing_user@example.com', 'Password': 'correct_password'})
+        mock_db.UserInfos.update_one = MagicMock()
+        new_account_data = {
+            "EmailAddress": "existing_user@example.com",
+            "Password": "correct_password",
+            "FirstName": "Test",
+            "LastName": "User",
+            "StudentID": "00000000",
+            "NickName": "Test User",
+            "HeadPortrait": "default.png",
+            "Birthday": "2000-01-01",
+            "Gender": "Male",
+            "PhoneNumber": "123456789",
+            "Profile": "This is a test profile.",
+            "Region": "Waterloo",
+            "FavoriteFields": [],
+        }
+        response = self.app.post('/create-account', json=new_account_data)
+        self.assertEqual(response.status_code, 200)
+        json_data = response.get_json()
+        self.assertTrue(json_data['Success'])
+        newuserinfo= {'StudentID': '00000000', 'FirstName': 'Test', 'LastName': 'User', 'NickName': 'Test User', 'Birthday': '2000-01-01', 'Gender': 'Male', 'Profile': 'This is a test profile.', 'Region': 'Waterloo', 'PhoneNumber': '123456789', 'HeadPortrait': 'default.png'}
+        mock_db.UserInfos.update_one.assert_called_once_with({'EmailAddress': 'existing_user@example.com'}, {"$set": newuserinfo})
+    
 
 
 

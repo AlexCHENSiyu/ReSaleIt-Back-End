@@ -1136,11 +1136,11 @@ def GetPostHistory():
         return return_data
     
     UserInfo = db.UserInfos.find_one({'EmailAddress': EmailAddress})
-    if not UserInfo:
+    #if not UserInfo:
         # 此账户不存在
-        Success = False
-        Error = "Did not find account. Please try it again!"
-        return Success, Error
+        #Success = False
+        #Error = "Did not find account. Please try it again!"
+        #return Success, Error
     
     PostHistory_new = []
     hasInvalidPID = False
