@@ -1261,6 +1261,47 @@ def GetPostHistory():
     return_data["Success"] = True
 
     return return_data
+@api.route('/old-post', methods=['GET'])
+def OldPost():
+    return_data={}
+    PID = request.args.get('PID')
+    Post = db.Posts.find_one({'_id': ObjectId(PID)})
+    if Post:
+        current_post=\
+        {
+            "PID": str(Post['_id']),\
+            "PostOwner": Post.get("PostOwner"),\
+            "CreateTime": Post.get('CreateTime'),\
+            "Title": Post.get("Title"),\
+            "Text": Post.get("Text"),\
+            "Price": Post.get("Price"),\
+            "Auction": Post.get("Auction"),\
+            "LostFound": Post.get("LostFound"),\
+            "Images": Post.get("Images"),\
+            "Comments": Post.get('Comments'),\
+            "Score": Post.get('Score')\
+        }
+        return_data = current_post
+    return return_data
+
+
+@api.route('/true-edit-pid', methods=['POST'])
+def TrueEditPID():
+    return_data={}
+    NewPost={}
+    PID = request.form.get('PID')
+    post=request.form.get('Post')
+    post=json.loads(post)
+    NewPost=post
+    NewPost['Deleted'] = False
+    #print("The title is:")
+    #print(NewPost['Title'])
+    TimeAttribute = get_time_attribute('create withour code')
+    NewPost.update(TimeAttribute) 
+    db.Posts.update_one({'_id': ObjectId(PID)}, {"$set": NewPost})
+    return_data["Success"] = True
+    
+    return return_data
 
 
 
